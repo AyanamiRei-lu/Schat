@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      SCHAT requests two permissions, both of which exist to do one visible thing.
+
+      INTERNET  — reach the relay the user configured. The server routes ciphertext and
+                  stores public prekeys; it never sees a message.
+
+      CAMERA    — read a QR code, so that two devices can exchange a 64-character identity
+                  key without anybody typing it. Typing it by hand is not merely tedious:
+                  one wrong character produces the same "no bundle published for that
+                  identity" error as a peer that never published, so the mistake is
+                  indistinguishable from the symptom.
+
+      The camera is opened ONLY while the scan screen is on screen, and the frames are
+      decoded in memory and dropped. Nothing is photographed, stored, or transmitted —
+      QrScannerScreen is the only code in the app that touches the camera, and it hands
+      back a decoded string.
+
+      Still deliberately absent, and it must stay that way: READ_CONTACTS, any location
+      permission, READ_PHONE_STATE, READ_SMS, RECORD_AUDIO, and every advertising
+      identifier. SCHAT.md section 12.5 promises the app cannot collect what it never asks
+      for, and the manifest is where that promise is enforced.
+
+      Adding CAMERA weakens the older claim that SCHAT requests nothing but network
+      access. Three places carried that claim — SCHAT.md (sections 12.6 and 14.4),
+      docs/FAQ.md and docs/DEVICE-TEST.md — and all three were corrected in the same
+      change rather than left to go stale.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!--
+      required="false" so that a device without a camera can still install SCHAT. Scanning
+      is a convenience; the identity can always be pasted by hand, and refusing the whole
+      application over a missing camera would be absurd.
+    -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
+        android:required="false" />
+
+    <application
+        android:name=".SchatApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Schat">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Schat"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

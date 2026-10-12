@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Compose draws the entire UI, so this XML theme only needs to give the window a
+  sensible background before the first frame. Material3's colour scheme lives in
+  Kotlin (ui/theme/Theme.kt), not here.
+-->
+<resources>
+    <style name="Theme.Schat" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FFFBFE</item>
+    </style>
+</resources>

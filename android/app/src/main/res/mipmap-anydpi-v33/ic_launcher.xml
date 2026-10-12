@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 13 and later can tint the launcher icon to match the user's wallpaper. The
+  monochrome layer is a silhouette: the system keeps the alpha channel and replaces every
+  colour, so the white glyph works as-is.
+
+  It lives in a -v33 folder rather than being added to the -v26 file above, so that the
+  older file stays exactly what API 26 expects. An unknown <monochrome> tag is ignored by
+  older parsers in practice, but "ignored in practice" is not a property worth relying on
+  for a resource that is parsed at launcher start-up.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

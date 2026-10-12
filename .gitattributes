@@ -1,0 +1,51 @@
+# 统一行尾：进仓库一律 LF，检出也一律 LF。
+#
+# 这个项目的开发机是 Windows，而 Go、Kotlin 与 CI 大多跑在 Linux 上。在没有这条规则之前，
+# 同一棵源码树里 CRLF 与 LF 是混用的，代价是具体的：
+#
+#   - 用文本匹配去改代码时，锚点会因为行尾不同而匹配不上，而失败信息看起来像"代码变了"，
+#     不像"行尾不同"；
+#   - 同一处改动在不同机器上会产生不同的 diff，review 时看不出真正改了什么。
+#
+# 这不是洁癖：本项目在一次签名变更里，因为 CRLF 与 LF 混用而误改过测试文件。
+* text=auto eol=lf
+
+# Windows 专用脚本保持 CRLF：记事本与旧版 PowerShell 对 LF 的 .ps1 处理不佳，
+# 而 .ps1 本来就不会在 Linux 上运行。
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制：不做行尾转换，也不尝试文本 diff。
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.apk  binary
+*.aab  binary
+*.aar  binary
+*.jar  binary
+*.so   binary
+*.dex  binary
+*.class binary
+*.keystore binary
+*.jks  binary
+*.p12  binary
+*.pfx  binary
+*.pem  binary
+*.der  binary
+*.zip  binary
+*.gz   binary
+*.wasm binary
+
+# 设计文档很长（SCHAT.md 超过 100 KB）。把它们标成文档，免得语言统计把整个仓库
+# 说成是 Markdown 项目——这是给别人看的第一个数字，不该是错的。
+SCHAT.md        linguist-documentation
+SECURITY.md     linguist-documentation
+README.md       linguist-documentation
+docs/**         linguist-documentation
+
+# 生成的快照测试数据不参与语言统计。
+*.golden        linguist-generated

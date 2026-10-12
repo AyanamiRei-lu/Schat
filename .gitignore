@@ -1,0 +1,67 @@
+# ---- Go ----
+/server/schat-server
+/server/schat-server.exe
+/build/
+*.test
+*.out
+coverage.txt
+
+# Go 的 workspace 文件是刻意提交的（见 go.work），但本地覆盖不是。
+go.work.sum
+
+# ---- Android / Gradle ----
+/android/.gradle/
+/android/.kotlin/
+/android/build/
+/android/local.properties
+/android/.idea/
+/android/captures/
+/android/.cxx/
+
+# 通配形式：任何模块的 build 目录都是产物。
+#
+# 原来只写了 build/ 与 app/build/，于是 core/build/ 与它的 .transforms/ 会被提交进去——
+# 那一次是 273 个编译产物文件，而它们从文件名上完全看不出来。
+/android/**/build/
+
+# 协议 AAR 及其 sources jar 都由 tools/build-protocol.ps1 生成，不进仓库。
+/android/app/libs/
+
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.jar
+# Gradle Wrapper 的 jar 是例外：它是 wrapper 的一部分，没有它 ./gradlew 不能自举。
+!gradle/wrapper/gradle-wrapper.jar
+
+# ---- gomobile / native ----
+*.so
+obj/
+
+# ---- 密钥与本机数据（SCHAT 绝不提交任何密钥材料）----
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.der
+secrets/
+.schat/
+
+# 服务器运行时的状态目录：里面有自签 TLS 证书的【私钥】。
+# *.pem 已经兜住了它，但整个目录也忽略掉——免得以后放进去别的扩展名。
+/server/state/
+
+# ---- 官方 MLS 测试向量（抓取用，绝不提交）----
+# 发布这些向量的 mls-implementations 仓库没有附 LICENSE，因此适用默认规则：保留所有权利。
+# 它们由 tools/fetch-mls-vectors.ps1 在本地抓取，用于验证；不能从这里再分发。
+/protocol/mls/vectors/
+
+# ---- 编辑器与操作系统 ----
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp

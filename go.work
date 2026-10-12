@@ -1,0 +1,18 @@
+// Go workspace for SCHAT.
+//
+// SCHAT is split into two completely independent deliverables (see SCHAT.md
+// section 9): the Android client under android/ and the relay server under
+// server/. The SCS-1 protocol core lives in protocol/ and is consumed by both
+// the server (structure/envelope handling only) and, through gomobile, by the
+// Android client.
+//
+// This workspace file exists purely for local development convenience so that
+// `go build ./...` and `go test ./...` work from the repository root without
+// publishing the protocol module first. Production builds of the server still
+// work standalone because server/go.mod carries a replace directive.
+go 1.27
+
+use (
+	./protocol
+	./server
+)

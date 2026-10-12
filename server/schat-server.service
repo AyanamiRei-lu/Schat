@@ -1,0 +1,74 @@
+# systemd unit for the SCHAT relay server.
+#
+# Install:
+#   sudo install -m 0755 schat-server /usr/local/bin/schat-server
+#   sudo install -m 0644 schat-server.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now schat-server
+#
+# The hardening below is unusually strict on purpose: the relay needs no
+# filesystem, no privileges and no writable state, so almost every capability can
+# be dropped. SCHAT.md section 7 promises the server cannot retain user data;
+# this unit makes the operating system enforce that too.
+
+[Unit]
+Description=SCHAT relay server (end-to-end encrypted message relay)
+Documentation=https://github.com/schat/schat/blob/main/docs/SERVER-SETUP.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=schat
+Group=schat
+
+# Zero configuration is the supported default. The server generates a persistent
+# self-signed certificate under --state-dir and prints its fingerprint, which
+# clients pin. It does NOT obtain Let's Encrypt certificates: see the header of
+# docs/SERVER-SETUP.md for why, and use a reverse proxy for public TLS.
+ExecStart=/usr/local/bin/schat-server --listen 0.0.0.0:8443 --mode live --state-dir /var/lib/schat
+Restart=on-failure
+RestartSec=3
+# The state directory holds only the self-signed certificate and key.
+StateDirectory=schat
+StateDirectoryMode=0700
+
+# Port 443 requires the capability to bind a low port; 8443 does not. If you
+# switch to 443, uncomment the next two lines.
+# AmbientCapabilities=CAP_NET_BIND_SERVICE
+# CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+# ---- Sandboxing: the server has no state, so deny it everything ----
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+
+# ReadWritePaths is intentionally absent: nothing may be written. The relay
+# holds buffered envelopes in RAM only, so a restart discards them by design.
+ReadOnlyPaths=/
+
+# Memory ceiling, matching the design budget in SCHAT.md section 8.1.
+MemoryMax=256M
+TasksMax=512
+
+[Install]
+WantedBy=multi-user.target

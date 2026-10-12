@@ -1,0 +1,88 @@
+# Gradle version catalog for the SCHAT Android client.
+#
+# WHY THESE VERSIONS
+#
+# AGP 9.3.0 with Gradle 9.5.0 is the combination verified working on the
+# development machine (Android SDK at D:\asdk with platform 37 and
+# build-tools 37.0.0).
+#
+# THERE IS NO `org.jetbrains.kotlin.android` ENTRY HERE ON PURPOSE. AGP 9 has
+# built-in Kotlin support: applying that plugin now fails the build with
+# "The 'org.jetbrains.kotlin.android' plugin is no longer required for Kotlin
+# support since AGP 9.0." The Android plugin supplies the Kotlin compiler.
+#
+# The Compose Compiler Gradle plugin IS still required and IS applied. AGP 9
+# fails with "Starting in Kotlin 2.0, the Compose Compiler Gradle plugin is
+# required when compose is enabled" if it is missing. It is published by
+# JetBrains and versioned in lockstep with Kotlin, so kotlinCompose below must
+# track whichever Kotlin version AGP 9.3.0 uses.
+#
+# Compose artifact versions are NOT pinned individually either: the BOM pins
+# them, which is the only way to keep the Compose libraries mutually consistent.
+
+[versions]
+agp = "9.3.0"
+kotlinCompose = "2.4.0"
+composeBom = "2026.09.00"
+activityCompose = "1.13.0"
+junit = "4.13.2"
+# The one third-party runtime dependency in the whole client. The relay deliberately
+# has none, because its absence is what makes `go list -m all` a real audit; the client
+# has no such constraint, and hand-maintaining a WebSocket stack to avoid a well-tested
+# library would be the wrong trade.
+okhttp = "4.12.0"
+# QR codes, for the scan-to-connect feature.
+#
+# WHY ZXING AND NOT ML KIT
+#
+# ML Kit's barcode scanning has the nicer API and would have been less code, but it is a
+# CLOSED-SOURCE SDK. There is no source to read, no way to audit what it does with the
+# camera frames, and no way to build it from source — which is not a defensible dependency
+# for an application whose entire proposition is "you can check what this does".
+#
+# ZXing core is pure Java, Apache-2.0, and has no native code, so it also runs on the JVM:
+# the encode path, the payload format and the decode path are all covered by :core's test
+# suite on every build.
+zxing = "3.5.3"
+
+# Camera preview and frame delivery for the scanner.
+#
+# CameraX rather than raw camera2: the camera2 lifecycle, rotation and format negotiation
+# is where a hand-rolled implementation silently produces frames that never decode, and
+# this code cannot be tested without a device. AndroidX, Apache-2.0, no native binaries.
+camerax = "1.4.2"
+
+[libraries]
+# Activity + Compose host.
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+
+# Compose, versioned by the BOM.
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+
+# Test dependencies.
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+
+# Networking.
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+
+# QR encoding and decoding (pure Java, no Android dependency).
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+
+# Camera preview and per-frame analysis for the scanner. Only :app uses these.
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlinCompose" }
+# NOTE: :core applies org.jetbrains.kotlin.jvm WITHOUT a version, and therefore has no
+# entry here. AGP 9 puts the Kotlin Gradle plugin on the build classpath already, and
+# requesting a version for it fails with "already on the classpath with an unknown
+# version". See core/build.gradle.kts.

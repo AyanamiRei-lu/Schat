@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SCHAT</string>
+
+    <string name="status_title">构建状态</string>
+    <string name="status_subtitle">工程骨架 · 步骤 1</string>
+
+    <string name="section_done">已实现</string>
+    <string name="section_pending">待实现</string>
+
+    <string name="notice_title">安全声明</string>
+    <string name="notice_body">本版本尚未可用：中继服务器与端到端加密协议核心都还在实现中。代码未经第三方密码学审计，请不要用于任何真实的敏感通信。</string>
+</resources>

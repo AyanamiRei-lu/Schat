@@ -1,0 +1,16 @@
+# R8 keep rules for the SCHAT release build.
+#
+# This file is currently EMPTY of real rules on purpose.
+#
+# The release build has R8 optimisation disabled (see app/build.gradle.kts), so
+# nothing is stripped and nothing needs keeping. When R8 is enabled in step 8,
+# after the SCS-1 protocol core is linked in as an .aar, the rules below become
+# mandatory and must be validated against a release build that actually performs
+# a handshake:
+#
+#   -keep class go.** { *; }                     # gomobile export surface
+#   -keep class com.schat.android.protocol.** { *; }
+#   -keepclassmembers class * implements java.io.Serializable { *; }
+#
+# Getting this wrong is a security bug, not a size bug: a stripped field in the
+# ratchet state would silently corrupt key derivation.

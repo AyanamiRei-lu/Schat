@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SCHAT must never let the platform copy its vault anywhere.
+
+  allowBackup is already false in the manifest, and this file closes the Android
+  12+ equivalents as well. Cloud backup and device transfer are both excluded
+  entirely: the encrypted database, the media cache and any local configuration
+  are covered by the root, database, sharedpref and file domains below.
+
+  Losing a phone must mean losing the data unless the user kept their recovery
+  code. That is the intended behaviour (SCHAT.md section 12.1), not an accident.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+        <exclude domain="device_file" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+        <exclude domain="device_file" />
+    </device-transfer>
+</data-extraction-rules>
