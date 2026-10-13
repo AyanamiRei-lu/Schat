@@ -3,7 +3,7 @@ package group
 import (
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/tree"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/tree"
 )
 
 // Truncating after a removal (RFC 9420 section 7.7).

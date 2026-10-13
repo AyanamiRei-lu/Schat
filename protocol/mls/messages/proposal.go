@@ -24,9 +24,9 @@ package messages
 import (
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/crypto"
-	mlstls "github.com/schat/schat/protocol/mls/tls"
-	"github.com/schat/schat/protocol/mls/tree"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/tree"
 )
 
 // ProposalType is a two-byte enum: its values end at (0xffff).

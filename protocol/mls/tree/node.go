@@ -31,7 +31,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // NodeType identifies what a node holds. A one-byte enum: its values end at (255).

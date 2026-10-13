@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
 )
 
 // Applying an update path whose resolution is FILTERED (RFC 9420 section 7.6).

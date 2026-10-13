@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
 )
 
 // TestProposalReferenceMatchesTheSpecifiedConstruction pins the reference to the definition in

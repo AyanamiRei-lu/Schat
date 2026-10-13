@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/messages"
-	"github.com/schat/schat/protocol/mls/schedule"
-	"github.com/schat/schat/protocol/mls/secrettree"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/messages"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/schedule"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/secrettree"
 )
 
 // Snapshotting and restoring an epoch.

@@ -3,7 +3,7 @@ package secrettree
 import (
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
 )
 
 // The keys that protect a private message's sender data (RFC 9420 section 6.3.2).

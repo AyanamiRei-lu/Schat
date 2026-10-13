@@ -36,7 +36,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/schat/schat/protocol"
+	"github.com/AyanamiRei-lu/Schat/protocol"
 )
 
 // Version returns the protocol library version.

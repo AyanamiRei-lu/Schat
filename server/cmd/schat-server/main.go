@@ -37,14 +37,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/schat/schat/server/internal/config"
-	"github.com/schat/schat/server/internal/directory"
-	"github.com/schat/schat/server/internal/gateway"
-	"github.com/schat/schat/server/internal/metrics"
-	"github.com/schat/schat/server/internal/queue"
-	"github.com/schat/schat/server/internal/router"
-	"github.com/schat/schat/server/internal/tlsutil"
-	"github.com/schat/schat/server/internal/version"
+	"github.com/AyanamiRei-lu/Schat/server/internal/config"
+	"github.com/AyanamiRei-lu/Schat/server/internal/directory"
+	"github.com/AyanamiRei-lu/Schat/server/internal/gateway"
+	"github.com/AyanamiRei-lu/Schat/server/internal/metrics"
+	"github.com/AyanamiRei-lu/Schat/server/internal/queue"
+	"github.com/AyanamiRei-lu/Schat/server/internal/router"
+	"github.com/AyanamiRei-lu/Schat/server/internal/tlsutil"
+	"github.com/AyanamiRei-lu/Schat/server/internal/version"
 )
 
 // shutdownGrace is how long in-flight requests get to finish on SIGTERM.

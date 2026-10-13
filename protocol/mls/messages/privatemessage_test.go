@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // The private message codec, plus the two differences that decide interoperability: the AADs

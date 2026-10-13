@@ -6,9 +6,9 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/crypto"
-	"github.com/schat/schat/protocol/mls/messages"
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/messages"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // Whether a KeyPackage and the private key returned beside it are a pair.

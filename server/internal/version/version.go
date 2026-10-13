@@ -8,7 +8,7 @@ import (
 
 // These are overridden at build time with:
 //
-//	go build -ldflags "-X github.com/schat/schat/server/internal/version.Version=..."
+//	go build -ldflags "-X github.com/AyanamiRei-lu/Schat/server/internal/version.Version=..."
 const (
 	// Version is the semantic version of the server.
 	Version = "0.1.0-alpha"

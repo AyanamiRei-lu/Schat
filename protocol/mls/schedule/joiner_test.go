@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
 )
 
 // The joiner's derivation, checked against the official key-schedule vectors.

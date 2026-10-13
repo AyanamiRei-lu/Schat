@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
 )
 
 // The sender data keys, against the official vectors.

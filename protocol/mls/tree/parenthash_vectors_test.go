@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
 )
 
 // TestParentHashesAgainstOfficialVectors checks the stored parent_hash of every node against

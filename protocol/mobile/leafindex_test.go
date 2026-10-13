@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	mlstls "github.com/schat/schat/protocol/mls/tls"
-	"github.com/schat/schat/protocol/mls/tree"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/tree"
 )
 
 // Where a joining member actually IS.

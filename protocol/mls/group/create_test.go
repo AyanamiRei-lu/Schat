@@ -5,9 +5,9 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/messages"
-	"github.com/schat/schat/protocol/mls/schedule"
-	"github.com/schat/schat/protocol/mls/tree"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/messages"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/schedule"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/tree"
 )
 
 // Creating a group, and the one thing that cannot be checked about it yet.

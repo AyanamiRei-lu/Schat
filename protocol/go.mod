@@ -1,4 +1,4 @@
-module github.com/schat/schat/protocol
+module github.com/AyanamiRei-lu/Schat/protocol
 
 go 1.27
 

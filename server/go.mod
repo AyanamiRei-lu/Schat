@@ -1,9 +1,9 @@
-module github.com/schat/schat/server
+module github.com/AyanamiRei-lu/Schat/server
 
 go 1.27
 
 // This module deliberately has ZERO dependencies beyond the Go standard
-// library, and deliberately does NOT import github.com/schat/schat/protocol.
+// library, and deliberately does NOT import github.com/AyanamiRei-lu/Schat/protocol.
 //
 // That is an architectural guarantee, not a style preference. SCHAT.md
 // section 7.2 promises that the relay server cannot decrypt user content. If the

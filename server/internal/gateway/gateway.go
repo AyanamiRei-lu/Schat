@@ -54,11 +54,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/schat/schat/server/internal/config"
-	"github.com/schat/schat/server/internal/metrics"
-	"github.com/schat/schat/server/internal/queue"
-	"github.com/schat/schat/server/internal/router"
-	"github.com/schat/schat/server/internal/ws"
+	"github.com/AyanamiRei-lu/Schat/server/internal/config"
+	"github.com/AyanamiRei-lu/Schat/server/internal/metrics"
+	"github.com/AyanamiRei-lu/Schat/server/internal/queue"
+	"github.com/AyanamiRei-lu/Schat/server/internal/router"
+	"github.com/AyanamiRei-lu/Schat/server/internal/ws"
 )
 
 // TokenSize is the length of a delivery token.

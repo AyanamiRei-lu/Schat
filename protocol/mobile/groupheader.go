@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/messages"
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/messages"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // Reading a group message's public header.

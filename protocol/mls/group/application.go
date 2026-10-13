@@ -3,9 +3,9 @@ package group
 import (
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/messages"
-	"github.com/schat/schat/protocol/mls/secrettree"
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/messages"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/secrettree"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // Sealing and opening application messages (RFC 9420 sections 6.3 and 9.1).

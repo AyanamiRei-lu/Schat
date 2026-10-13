@@ -3,9 +3,9 @@ package group
 import (
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/crypto"
-	"github.com/schat/schat/protocol/mls/messages"
-	"github.com/schat/schat/protocol/mls/tree"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/messages"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/tree"
 )
 
 // Applying a commit's proposals to a working tree.

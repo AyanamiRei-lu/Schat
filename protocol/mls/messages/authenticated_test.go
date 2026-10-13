@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	mlstls "github.com/schat/schat/protocol/mls/tls"
-	"github.com/schat/schat/protocol/mls/tree"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/tree"
 )
 
 // TestAuthenticatedContentCannotBeReadWithTheWrongType is the test the low-level API could not

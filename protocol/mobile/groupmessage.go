@@ -8,11 +8,11 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/crypto"
-	"github.com/schat/schat/protocol/mls/group"
-	"github.com/schat/schat/protocol/mls/messages"
-	"github.com/schat/schat/protocol/mls/secrettree"
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/group"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/messages"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/secrettree"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // Sending and reading group messages, from the binding.

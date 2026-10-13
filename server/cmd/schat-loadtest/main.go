@@ -28,7 +28,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/schat/schat/server/internal/wstest"
+	"github.com/AyanamiRei-lu/Schat/server/internal/wstest"
 )
 
 func main() {

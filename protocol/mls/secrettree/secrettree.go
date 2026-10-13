@@ -44,8 +44,8 @@ package secrettree
 import (
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/crypto"
-	"github.com/schat/schat/protocol/mls/tree"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/tree"
 )
 
 // Tree is one epoch's secret tree, identified by its root secret.

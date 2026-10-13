@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/schat/schat/protocol"
+	"github.com/AyanamiRei-lu/Schat/protocol"
 )
 
 // The session API exposed to the client.

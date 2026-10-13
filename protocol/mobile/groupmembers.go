@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/group"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/group"
 )
 
 // 群里有谁。

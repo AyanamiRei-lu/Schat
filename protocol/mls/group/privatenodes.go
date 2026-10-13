@@ -3,8 +3,8 @@ package group
 import (
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/crypto"
-	"github.com/schat/schat/protocol/mls/tree"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/tree"
 )
 
 // The private keys along a member's own direct path (RFC 9420 section 12.4.3.1).

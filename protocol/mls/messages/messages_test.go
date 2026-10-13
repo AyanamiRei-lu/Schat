@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/crypto"
-	mlstls "github.com/schat/schat/protocol/mls/tls"
-	"github.com/schat/schat/protocol/mls/tree"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/tree"
 )
 
 // suiteUnderTest is the cipher suite the official vectors use for the structures this package

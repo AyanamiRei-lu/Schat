@@ -6,8 +6,8 @@ import (
 	"crypto/cipher"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/messages"
-	"github.com/schat/schat/protocol/mls/secrettree"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/messages"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/secrettree"
 )
 
 // Group messages: sealing and opening, and the four ways a message must be refused.

@@ -22,8 +22,8 @@ package messages
 import (
 	"fmt"
 
-	mlstls "github.com/schat/schat/protocol/mls/tls"
-	"github.com/schat/schat/protocol/mls/tree"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/tree"
 )
 
 // WireFormat is a TWO-BYTE value. See the package comment: this is the field most likely to

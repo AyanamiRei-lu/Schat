@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
 )
 
 // TestUpdatePathCiphertextsRejectEveryoneElse tests the negative side of path secret

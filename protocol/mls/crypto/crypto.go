@@ -43,7 +43,7 @@ import (
 	"fmt"
 	"hash"
 
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // labelPrefix is prepended to every label used in a signature or an HPKE encryption

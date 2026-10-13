@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/schat/schat/protocol"
+	"github.com/AyanamiRei-lu/Schat/protocol"
 )
 
 // These tests exercise the binding layer without gomobile. Everything here is

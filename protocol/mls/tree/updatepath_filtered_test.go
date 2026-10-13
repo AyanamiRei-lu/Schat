@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
 )
 
 // The exclusion set, which is what makes a removal a removal.

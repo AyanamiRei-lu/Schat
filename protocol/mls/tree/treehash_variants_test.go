@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/crypto"
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // TestTreeHashLeafVariants is the second round of diagnosis.

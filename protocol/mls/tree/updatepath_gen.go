@@ -3,7 +3,7 @@ package tree
 import (
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
 )
 
 // UpdatePath generation (RFC 9420 sections 7.5 and 7.6).

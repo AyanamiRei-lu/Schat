@@ -1,6 +1,6 @@
 package tree
 
-import mlstls "github.com/schat/schat/protocol/mls/tls"
+import mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 
 // MarshalTo encodes an UpdatePath onto an existing writer.
 //

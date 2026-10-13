@@ -4,10 +4,10 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/crypto"
-	"github.com/schat/schat/protocol/mls/group"
-	"github.com/schat/schat/protocol/mls/messages"
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/group"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/messages"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // Joining a group from a Welcome, from the binding.

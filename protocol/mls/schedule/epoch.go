@@ -3,7 +3,7 @@ package schedule
 import (
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
 )
 
 // Deriving an epoch's secrets from a GIVEN epoch secret.

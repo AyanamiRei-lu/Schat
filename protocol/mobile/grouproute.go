@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/group"
-	"github.com/schat/schat/protocol/mls/schedule"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/group"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/schedule"
 )
 
 // The route key a group's messages are delivered under.

@@ -16,8 +16,8 @@
 
 推荐流程：
 
-1. 通过 GitHub 的 **Private vulnerability reporting**（仓库 `Security` 标签页 → `Report a vulnerability`）提交；
-2. 或发送加密邮件到仓库维护者公布的联系地址（建议用维护者的 PGP 公钥加密）。
+通过 GitHub 的 **Private vulnerability reporting** 提交：仓库 `Security` 标签页 →
+`Report a vulnerability`。这条通道是私密的，只有维护者能看到，适合承载尚未修复的问题。
 
 请在报告中尽量包含：
 

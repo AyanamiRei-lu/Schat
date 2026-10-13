@@ -5,8 +5,8 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/messages"
-	"github.com/schat/schat/protocol/mls/tree"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/messages"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/tree"
 )
 
 // Two Adds in ONE commit: does the sender's tree match the receiver's?

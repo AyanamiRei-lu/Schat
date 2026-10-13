@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/schat/schat/protocol"
+	"github.com/AyanamiRei-lu/Schat/protocol"
 )
 
 // TestPublishBundleJSONCarriesTheWholePool guards the failure this function exists to

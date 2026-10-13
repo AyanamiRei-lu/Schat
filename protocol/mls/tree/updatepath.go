@@ -3,7 +3,7 @@ package tree
 import (
 	"fmt"
 
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // UpdatePath (RFC 9420 section 7.7).

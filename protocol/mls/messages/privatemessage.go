@@ -3,7 +3,7 @@ package messages
 import (
 	"fmt"
 
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // Private messages: the structure and the two associated-data constructions

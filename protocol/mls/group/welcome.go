@@ -3,10 +3,10 @@ package group
 import (
 	"fmt"
 
-	"github.com/schat/schat/protocol/mls/crypto"
-	"github.com/schat/schat/protocol/mls/messages"
-	"github.com/schat/schat/protocol/mls/schedule"
-	"github.com/schat/schat/protocol/mls/tree"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/messages"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/schedule"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/tree"
 )
 
 // Building a Welcome (RFC 9420 sections 12.4.2 and 12.4.3.1).

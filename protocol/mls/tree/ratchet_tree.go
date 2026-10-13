@@ -3,7 +3,7 @@ package tree
 import (
 	"fmt"
 
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // The ratchet tree extension (RFC 9420 section 12.4.3.3).

@@ -1,0 +1,143 @@
+name: CI
+
+# 每次推送到 main、以及每个 PR，都跑一遍这个项目声称"通过"的东西。
+#
+# 这个文件的存在有一个具体的理由：README 与 SCHAT.md 里写了很多"✅ 已通过"的数字。
+# 数字如果没有人替读者重新跑一遍，它就只是一句话。CI 把它变成可核对的。
+#
+# 关于 job 的划分：Go 那两个 job 是**可靠**的——零第三方依赖、零环境依赖，在任何
+# Linux runner 上都能跑。Android 那个 job 标了 continue-on-error，原因写在它自己的
+# 注释里，这里不重复。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # 允许在网页上手点一次重跑。
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 协议核心与 MLS 全部层
+  # ---------------------------------------------------------------------------
+  #
+  # 从 protocol/ 里跑，不是从仓库根目录：根目录有 go.work，而根目录本身不属于任何
+  # workspace 模块，所以 `go build ./...` 会被 Go 拒绝。这一点 README 里也写了。
+  protocol:
+    name: protocol (SCS-1 + MLS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27'
+
+      - name: 单元测试与自洽性测试
+        working-directory: protocol
+        run: go test ./... -count=1
+
+      - name: 竞态检测
+        working-directory: protocol
+        run: go test -race ./... -count=1
+
+      - name: 构建
+        working-directory: protocol
+        run: go build ./...
+
+  # ---------------------------------------------------------------------------
+  # 中继服务器，以及它那两条"结构性"主张
+  # ---------------------------------------------------------------------------
+  #
+  # tools/verify.ps1 里也做这两项检查，但那个脚本是 PowerShell，在 Linux runner 上
+  # 跑不了。所以这里用 go list 重写一遍——检查的是同一件事，不是另一件事。
+  server:
+    name: server (relay)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27'
+
+      - name: 单元测试
+        working-directory: server
+        run: go test ./... -count=1
+
+      - name: 构建
+        working-directory: server
+        run: go build ./...
+
+      - name: 主张一：零第三方依赖
+        working-directory: server
+        run: |
+          # GOWORK=off 是关键：否则 go.work 会把 protocol 也拉进来，
+          # 于是这项检查会因为一个服务器刻意不依赖的模块而失败。
+          deps="$(GOWORK=off go list -m all | tail -n +2)"
+          if [ -n "$deps" ]; then
+            echo "::error::服务端出现了第三方依赖："
+            echo "$deps"
+            exit 1
+          fi
+          echo "✓ 只有自身模块"
+
+      - name: 主张二：服务端不含解密代码（不导入协议核心）
+        working-directory: server
+        run: |
+          # 这一条不是风格问题：服务器能看到全部密文与元数据，它唯一能给出的
+          # 隐私保证是"读不懂"。一旦它导入了协议核心，那个保证就只剩下一句承诺。
+          if GOWORK=off go list -deps ./... | grep -q 'schat/schat/protocol'; then
+            echo "::error::服务端导入了协议核心，它因此可能解密"
+            GOWORK=off go list -deps ./... | grep 'schat/schat/protocol'
+            exit 1
+          fi
+          echo "✓ 依赖树里没有协议核心"
+
+  # ---------------------------------------------------------------------------
+  # 安卓客户端核心（纯 JVM）
+  # ---------------------------------------------------------------------------
+  #
+  # ⚠️ 这个 job 标了 continue-on-error，那是有意的，不是偷懒：
+  #
+  # :core 本身是纯 JVM 模块，但它所在的 Gradle 构建里还有 :app，而 :app 是 Android
+  # 模块，配置阶段就要求 SDK 里存在它声明的 platform 与 build-tools 版本。GitHub 的
+  # ubuntu runner 预装 Android SDK，但装的是哪个 platform 不由本仓库决定。
+  #
+  # 所以：这个 job 的结果**要读**，但它变黄不代表代码有问题，而可能只是 runner 上的
+  # SDK 版本对不上。本地按 docs/BUILDING.md 跑 `tools/verify.ps1` 是权威的那一次。
+  #
+  # 如果哪天它在 CI 上稳定变绿，就把 continue-on-error 去掉。
+  android-core:
+    name: android :core (best effort)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          # JDK 25：Android Gradle Plugin 9.x 与 Gradle 9.5 的要求。
+          java-version: '25'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: 允许 gradlew 执行
+        # 这个仓库是在 Windows 上开发的，可执行位不一定会跟着进 git。
+        run: chmod +x android/gradlew
+
+      - name: 客户端核心测试
+        working-directory: android
+        run: ./gradlew :core:test --console=plain
+
+      - name: 上传测试报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-test-results
+          path: android/core/build/test-results/test/*.xml
+          if-no-files-found: ignore

@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/crypto"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
 )
 
 // TestApplyUpdatePathReconstructsTheSendersTree closes the loop on M3b part three.

@@ -3,7 +3,7 @@ package messages
 import (
 	"fmt"
 
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // The safe entry point for reading a whole authenticated message.

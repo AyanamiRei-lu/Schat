@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/schat/schat/protocol/mls/crypto"
-	mlstls "github.com/schat/schat/protocol/mls/tls"
-	"github.com/schat/schat/protocol/mls/tree"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/crypto"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
+	"github.com/AyanamiRei-lu/Schat/protocol/mls/tree"
 )
 
 // KeyPackages: the structure an Add proposal carries, and the checks that decide whether one

@@ -3,7 +3,7 @@ package schedule
 import (
 	"fmt"
 
-	mlstls "github.com/schat/schat/protocol/mls/tls"
+	mlstls "github.com/AyanamiRei-lu/Schat/protocol/mls/tls"
 )
 
 // Parsing a GroupContext.
