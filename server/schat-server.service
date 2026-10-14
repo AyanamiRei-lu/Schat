@@ -13,7 +13,7 @@
 
 [Unit]
 Description=SCHAT relay server (end-to-end encrypted message relay)
-Documentation=https://github.com/schat/schat/blob/main/docs/SERVER-SETUP.md
+Documentation=https://github.com/AyanamiRei-lu/Schat/blob/main/docs/SERVER-SETUP.md
 After=network-online.target
 Wants=network-online.target
 

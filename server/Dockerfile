@@ -34,7 +34,7 @@ ARG VERSION=0.1.0-alpha
 ARG COMMIT=unknown
 RUN CGO_ENABLED=0 GOOS=linux go build \
       -trimpath \
-      -ldflags "-s -w -X github.com/schat/schat/server/internal/version.Version=${VERSION} -X github.com/schat/schat/server/internal/version.Commit=${COMMIT}" \
+      -ldflags "-s -w -X github.com/AyanamiRei-lu/Schat/server/internal/version.Version=${VERSION} -X github.com/AyanamiRei-lu/Schat/server/internal/version.Commit=${COMMIT}" \
       -o /out/schat-server ./cmd/schat-server
 
 # ---------------------------------------------------------------------------

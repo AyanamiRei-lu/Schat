@@ -6,10 +6,14 @@ import (
 	"runtime"
 )
 
-// These are overridden at build time with:
+// These are VARIABLES, not constants, on purpose: -ldflags -X can only set a
+// string VARIABLE. Against a const it does nothing at all and reports no error,
+// so a build that tried to stamp its version would silently keep these defaults.
+//
+// Overridden at build time with:
 //
 //	go build -ldflags "-X github.com/AyanamiRei-lu/Schat/server/internal/version.Version=..."
-const (
+var (
 	// Version is the semantic version of the server.
 	Version = "0.1.0-alpha"
 
