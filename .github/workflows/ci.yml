@@ -4,16 +4,11 @@ name: CI
 #
 # 这个文件的存在有一个具体的理由：README 与 SCHAT.md 里写了很多"✅ 已通过"的数字。
 # 数字如果没有人替读者重新跑一遍，它就只是一句话。CI 把它变成可核对的。
-#
-# 关于 job 的划分：Go 那两个 job 是**可靠**的——零第三方依赖、零环境依赖，在任何
-# Linux runner 上都能跑。Android 那个 job 标了 continue-on-error，原因写在它自己的
-# 注释里，这里不重复。
 
 on:
   push:
     branches: [main]
   pull_request:
-  # 允许在网页上手点一次重跑。
   workflow_dispatch:
 
 permissions:
@@ -23,9 +18,6 @@ jobs:
   # ---------------------------------------------------------------------------
   # 协议核心与 MLS 全部层
   # ---------------------------------------------------------------------------
-  #
-  # 从 protocol/ 里跑，不是从仓库根目录：根目录有 go.work，而根目录本身不属于任何
-  # workspace 模块，所以 `go build ./...` 会被 Go 拒绝。这一点 README 里也写了。
   protocol:
     name: protocol (SCS-1 + MLS)
     runs-on: ubuntu-latest
@@ -36,6 +28,8 @@ jobs:
         with:
           go-version: '1.27'
 
+      # 从 protocol/ 里跑，不是从仓库根目录：根目录有 go.work，而根目录本身不属于
+      # 任何 workspace 模块，所以从根目录 `go build ./...` 会被 Go 拒绝。
       - name: 单元测试与自洽性测试
         working-directory: protocol
         run: go test ./... -count=1
@@ -51,9 +45,6 @@ jobs:
   # ---------------------------------------------------------------------------
   # 中继服务器，以及它那两条"结构性"主张
   # ---------------------------------------------------------------------------
-  #
-  # tools/verify.ps1 里也做这两项检查，但那个脚本是 PowerShell，在 Linux runner 上
-  # 跑不了。所以这里用 go list 重写一遍——检查的是同一件事，不是另一件事。
   server:
     name: server (relay)
     runs-on: ubuntu-latest
@@ -90,9 +81,9 @@ jobs:
         run: |
           # 这一条不是风格问题：服务器能看到全部密文与元数据，它唯一能给出的
           # 隐私保证是"读不懂"。一旦它导入了协议核心，那个保证就只剩下一句承诺。
-          if GOWORK=off go list -deps ./... | grep -q 'schat/schat/protocol'; then
+          if GOWORK=off go list -deps ./... | grep -q 'Schat/protocol'; then
             echo "::error::服务端导入了协议核心，它因此可能解密"
-            GOWORK=off go list -deps ./... | grep 'schat/schat/protocol'
+            GOWORK=off go list -deps ./... | grep 'Schat/protocol'
             exit 1
           fi
           echo "✓ 依赖树里没有协议核心"
@@ -101,20 +92,40 @@ jobs:
   # 安卓客户端核心（纯 JVM）
   # ---------------------------------------------------------------------------
   #
-  # ⚠️ 这个 job 标了 continue-on-error，那是有意的，不是偷懒：
+  # 关于这个 job，有三件事要说明白：
   #
-  # :core 本身是纯 JVM 模块，但它所在的 Gradle 构建里还有 :app，而 :app 是 Android
-  # 模块，配置阶段就要求 SDK 里存在它声明的 platform 与 build-tools 版本。GitHub 的
-  # ubuntu runner 预装 Android SDK，但装的是哪个 platform 不由本仓库决定。
+  # 1. 为什么它标着 continue-on-error
   #
-  # 所以：这个 job 的结果**要读**，但它变黄不代表代码有问题，而可能只是 runner 上的
-  # SDK 版本对不上。本地按 docs/BUILDING.md 跑 `tools/verify.ps1` 是权威的那一次。
+  #    :core 本身是纯 JVM 模块（android/core/build.gradle.kts 的原话是
+  #    "Depends on: nothing but the Kotlin standard library"），但
+  #    settings.gradle.kts 里 include 了 :app，而 :app 是 Android 模块，
+  #    配置阶段就要求 SDK 里存在它声明的 compileSdk（37）。GitHub 的 runner
+  #    预装 Android SDK，但装的是哪个 platform 不由本仓库决定。
   #
-  # 如果哪天它在 CI 上稳定变绿，就把 continue-on-error 去掉。
+  #    所以：这个 job 的结果**要读**，但它变黄不代表代码有问题，而可能只是
+  #    runner 上的 SDK 版本对不上。本地跑 tools/verify.ps1 是权威的那一次。
+  #
+  # 2. 为什么不用 android-actions/setup-android
+  #
+  #    它发现 runner 预装的 sdkmanager 是 12.0，就判定"版本错误"，然后去
+  #    dl.google.com 下载一个新的命令行工具，再跑 `sdkmanager --licenses`——
+  #    那一步会去拉 Google 的远程仓库清单，然后卡在那里直到超时。
+  #
+  #    一个与我们的代码毫无关系的动作，成了这个 job 最容易失败的地方。
+  #    runner 已经装好了 SDK，所以这里直接用它。
+  #
+  # 3. 为什么先打印 SDK 里有什么
+  #
+  #    如果它失败了，日志要能回答"到底缺什么"。上面那一步就是在回答这个。
   android-core:
     name: android :core (best effort)
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      # 这些在 ubuntu-latest 上通常已经设好；显式写出来是因为下面的 ls 依赖它，
+      # 而一个空变量会让那一步输出"没有 platforms 目录"，误导诊断。
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@v4
 
@@ -124,10 +135,17 @@ jobs:
           # JDK 25：Android Gradle Plugin 9.x 与 Gradle 9.5 的要求。
           java-version: '25'
 
-      - uses: android-actions/setup-android@v3
+      - name: 报告 runner 上装了哪个 Android platform
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "--- platforms ---"
+          ls -1 "$ANDROID_HOME/platforms" 2>/dev/null || echo "(没有 platforms 目录)"
+          echo "--- build-tools ---"
+          ls -1 "$ANDROID_HOME/build-tools" 2>/dev/null || echo "(没有 build-tools 目录)"
+          echo "本项目 (:app) 需要的是 platform 37 与 build-tools 37。"
 
       - name: 允许 gradlew 执行
-        # 这个仓库是在 Windows 上开发的，可执行位不一定会跟着进 git。
+        # 这个仓库是在 Windows 上开发的，可执行位不一定跟着进了 git。
         run: chmod +x android/gradlew
 
       - name: 客户端核心测试
