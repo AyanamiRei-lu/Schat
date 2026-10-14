@@ -1,6 +1,7 @@
 # systemd unit for the SCHAT relay server.
 #
 # Install:
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin schat
 #   sudo install -m 0755 schat-server /usr/local/bin/schat-server
 #   sudo install -m 0644 schat-server.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
@@ -26,7 +27,22 @@ Group=schat
 # self-signed certificate under --state-dir and prints its fingerprint, which
 # clients pin. It does NOT obtain Let's Encrypt certificates: see the header of
 # docs/SERVER-SETUP.md for why, and use a reverse proxy for public TLS.
-ExecStart=/usr/local/bin/schat-server --listen 0.0.0.0:8443 --mode live --state-dir /var/lib/schat
+# ---- 公网部署必须设置这一项 ----
+#
+# 客户端连接 URI 里写哪个地址，由它决定。不设的话，服务器会通告 localhost，
+# 手机配置完之后连的是【手机自己】——而这个失败看起来像"服务器没起来"，
+# 其实服务好得很。
+#
+# 把下面这行改成你的地址（注意：只有当 --listen 是 0.0.0.0 时它才生效——
+# 监听具体地址时，服务器用那个地址）：
+#     Environment=SCHAT_PUBLIC_HOST=--public-host=203.0.113.10
+# 用域名（前面挂反向代理终结 TLS）时：
+#     Environment=SCHAT_PUBLIC_HOST=--public-host=chat.example.com
+#
+# 留空则沿用旧行为：URI 里写 localhost，只适合本机测试。
+Environment=SCHAT_PUBLIC_HOST=
+
+ExecStart=/usr/local/bin/schat-server --listen 0.0.0.0:8443 --mode live --state-dir /var/lib/schat $SCHAT_PUBLIC_HOST
 Restart=on-failure
 RestartSec=3
 # The state directory holds only the self-signed certificate and key.

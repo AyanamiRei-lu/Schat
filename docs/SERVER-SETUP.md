@@ -1,8 +1,8 @@
 # 服务器部署与客户端连接
 
-> **状态：本文档将在路线图步骤 9 完成。**
-> 当前服务端的 WebSocket 网关与 TLS 终结尚未实现（步骤 3），因此**现在还不能真正收发消息**。
-> 本页先记录已经可以验证的部分，避免写出无法复现的教程。
+> **状态：本页描述的是已经实现并实测过的服务端。**
+> WebSocket 网关、TLS 终结与证书指纹都已可用（第 3 步完成），自签名证书持久化且指纹稳定。
+> 本文里的每一条命令都在一台真实机器上跑过；凡是**实测出来的行为**，都用「实测」标出。
 
 ---
 
@@ -67,25 +67,42 @@ go build -o schat-server ./cmd/schat-server
 ### 3. 验证运行状态
 
 ```bash
-curl http://127.0.0.1:18443/api/v1/health
+curl -k https://127.0.0.1:18443/api/v1/health
 ```
 
-返回内容会**明确列出尚未实现的功能**：
+> **实测：这里必须是 `https://` 并且带 `-k`。** 用 `http://` 访问会得到
+> `Client sent an HTTP request to an HTTPS server` —— 这句话看起来像服务器坏了，
+> 其实只是协议用错了。`-k` 是因为证书是自签的，`curl` 默认不认它。
+>
+> 端口：`8443` 是默认值。本文里为了不与已占用的端口冲突，示例一直用 `18443`——
+> 你自己部署时填 `--listen` 指定的那个。
+
+返回的是**这台服务器此刻的真实状态**（下面是一台本机实例实测的输出，指纹已换成占位符）：
 
 ```json
 {
   "status": "ok",
   "version": "0.1.0-alpha",
   "protocol": "SCS-1/v1",
-  "mode": "buffer",
+  "mode": "live",
   "storage": "none",
+  "fingerprint": "<这台服务器的证书指纹>",
+  "live_connections": 0,
+  "uptime_seconds": 4.8,
+  "prekey_directory": {
+    "identities": 0,
+    "one_time_prekeys": 0,
+    "note": "public key material only; held in RAM, never written to disk"
+  },
   "unimplemented": [
-    "the WebSocket gateway is not implemented yet (roadmap step 3)",
-    "TLS termination and certificate fingerprints are not implemented yet (roadmap step 3)",
-    "QR code rendering is not implemented yet (roadmap step 3)"
+    "the relay does not print a QR code, by design: it has no third-party dependencies. The client shows a connection code that another device can scan",
+    "media transfer (images, video, voice, files) is not implemented yet (roadmap step 7). Group chat IS implemented, in the client: this relay carries group envelopes without knowing or caring that they are group envelopes"
   ]
 }
 ```
+
+> `unimplemented` 这一项是**给运维看的诚实清单**，不是装饰。它曾经写着「WebSocket 网关尚未实现」
+> 和「群聊未实现」——两条都过时了，而它们出现在一个**任何人 curl 一下就能看到**的地方。
 
 `/ws` 现在是**真实网关**。用非 WebSocket 请求访问它会得到 **400 `bad websocket handshake`**（不再是 501）。真正的收发行为由 `go test ./server/internal/gateway/` 覆盖：两个真实 WebSocket 客户端经服务器互发信封，逐字节一致。
 
@@ -168,10 +185,33 @@ curl http://127.0.0.1:18443/api/v1/health
 ### 6. systemd 部署
 
 ```bash
+# 先创建服务账号：systemd 单元里写着 User=schat，而这个用户不会自己出现。
+# 少了这一步，服务会启动失败，日志是 "Failed to determine user credentials"。
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin schat
+
 sudo install -m 0755 schat-server /usr/local/bin/schat-server
 sudo install -m 0644 schat-server.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now schat-server
+```
+
+> **实测提醒：还要告诉服务器它对外叫什么。** 单元文件里的 `ExecStart` 带一个
+> `$SCHAT_PUBLIC_HOST` 变量，默认是空的。空着的话，服务器生成的连接 URI 里
+> 主机名是 `localhost`——手机配置完之后**连的是手机自己**，症状看起来像"服务器没起来"。
+>
+> 编辑 `/etc/systemd/system/schat-server.service`，把那一行改成你的地址：
+>
+> ```ini
+> Environment=SCHAT_PUBLIC_HOST=--public-host=203.0.113.10
+> ```
+>
+> 然后 `sudo systemctl daemon-reload && sudo systemctl restart schat-server`。
+>
+> **只有 `--listen` 是 `0.0.0.0` 时它才生效**（实测）：监听具体地址时，服务器用那个地址。
+> 所以「前面挂反向代理、服务端监听 `127.0.0.1`」这种部署，URI 里会写 `127.0.0.1` ✗ ——
+> 那种场景需要自己把 URI 里的主机名改掉，或者在客户端手动填写域名。
+
+```bash
 ```
 
 unit 文件已经做了严格加固：只读根文件系统、无任何可写路径、丢弃全部 capability、内存上限 256 MB。服务端**没有任何状态需要保存**，因此这些限制不会影响功能。
@@ -208,10 +248,26 @@ schat://connect?h=<主机>&p=<端口>&n=<名称>&fp=<证书指纹>&ss=<是否自
 
 | 参数 | 含义 |
 |---|---|
-| `h` | 主机名（若监听在 `0.0.0.0` 则回退到域名或 `localhost`） |
+| `h` | 主机名。**实测**：`--listen` 是 `0.0.0.0` 时用 `--public-host` 的值，没给就是 `localhost`；`--listen` 是具体地址时用它，`--public-host` 被忽略 |
 | `p` | 端口 |
 | `n` | 服务器显示名称 |
 | `fp` | 证书指纹（自签名时用于固定，步骤 3 产出） |
 | `ss` | `1` 表示自签名证书，客户端必须校验证书指纹 |
+
+### 证书什么时候会变（实测）
+
+同一个 `--state-dir`、同一组参数下，证书是**复用**的：启动日志会写
+`reusing the persisted self-signed certificate`，连续启动三次指纹完全相同。
+所以「配置一次即可长期使用」这句话是成立的。
+
+**但这几种改动会让指纹变**，客户端需要重新配置：
+
+| 改了什么 | 为什么 |
+|---|---|
+| `--name` | 服务器名字写进证书里 |
+| `--listen` | 监听地址写进证书的 SAN；`0.0.0.0` 与 `127.0.0.1` 会得到不同的证书 |
+| `--state-dir` | 换目录就是换一份状态，那里没有旧证书可复用 |
+
+改这些之前，先想一下有多少客户端已经固定了旧指纹。
 
 步骤 3 完成后，这条 URI 会被渲染成二维码，手机扫码即可完成配置（对应需求八"配置难度不得过高"）。

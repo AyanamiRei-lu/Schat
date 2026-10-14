@@ -442,7 +442,14 @@ func printBanner(cfg config.Config, stateDir, fingerprint string, noTLS bool, lo
 var startupNotices = []string{
 	"the relay does not print a QR code, by design: it has no third-party dependencies. " +
 		"The client shows a connection code that another device can scan",
-	"group chat (MLS, roadmap step 6) and media transfer (step 7) are not implemented",
+	// Second verse, same as the first (see the comment above): group chat moved to the
+	// client and needs NOTHING from this relay — it forwards group envelopes exactly like
+	// any other. Saying "group chat is not implemented" here made the health endpoint tell
+	// an operator that a working feature was missing, which is the same class of lie as the
+	// QR code sentence this list used to carry.
+	"media transfer (images, video, voice, files) is not implemented yet (roadmap step 7). " +
+		"Group chat IS implemented, in the client: this relay carries group envelopes " +
+		"without knowing or caring that they are group envelopes",
 }
 
 func healthHandler(cfg config.Config, c *metrics.Counters, gw *gateway.Gateway, keys *directory.Directory, fingerprint string) http.HandlerFunc {
