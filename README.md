@@ -25,6 +25,7 @@
 | [`docs/BUILDING.md`](docs/BUILDING.md) | 各组件构建指南与一键自检 |
 | [`SECURITY.md`](SECURITY.md) | 漏洞报告流程与审计者指南 |
 | [`docs/FAQ.md`](docs/FAQ.md) | 常见问题 |
+| [`docs/HANDOVER.md`](docs/HANDOVER.md) | **交接文档**：现状、未实现与未验证的清单、每个文件的作用、一路上真实踩过的坑 |
 
 ## 特性
 
