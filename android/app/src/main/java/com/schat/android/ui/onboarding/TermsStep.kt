@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
@@ -80,7 +78,8 @@ fun TermsStep(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
+            // 滚动由调用方提供：这里再加一个 verticalScroll 会构成同方向嵌套，
+            // 而 Compose 对此会抛 IllegalStateException（表现为闪退）。
             .padding(16.dp),
     ) {
         Text("使用前请阅读并同意以下条款")

@@ -3,11 +3,9 @@ package com.schat.android.ui.legal
 import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -82,8 +80,9 @@ fun LegalScreen(
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .fillMaxWidth()
+                // 滚动由调用方提供：这里再加一个 verticalScroll 会构成同方向嵌套，
+                // 而 Compose 对此会抛 IllegalStateException（表现为闪退）。
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             Text(text = text)
