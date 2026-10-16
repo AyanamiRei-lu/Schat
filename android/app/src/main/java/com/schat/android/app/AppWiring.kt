@@ -2,15 +2,11 @@ package com.schat.android.app
 
 import android.os.Handler
 import android.os.Looper
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -22,7 +18,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -42,6 +37,16 @@ import com.schat.android.core.profile.ClientProfileStore
 import com.schat.android.data.store.EncryptedStore
 import com.schat.android.ui.chat.ChatScreen
 import com.schat.android.ui.onboarding.OnboardingScreen
+import com.schat.android.ui.theme.Dimens
+import com.schat.android.ui.theme.SchatGradients
+import com.schat.android.ui.ui.ContentColumn
+import com.schat.android.ui.ui.FadeSwap
+import com.schat.android.ui.ui.GradientButton
+import com.schat.android.ui.ui.GradientCard
+import com.schat.android.ui.ui.ScreenBackground
+import com.schat.android.ui.ui.ScreenHeader
+import com.schat.android.ui.ui.SectionLabel
+import com.schat.android.ui.ui.StatusPill
 import java.io.File
 
 /**
@@ -173,51 +178,54 @@ fun SchatRoot() {
     }
     var error by remember { mutableStateOf<String?>(null) }
 
-    when (val current = stage) {
-        Stage.Setup -> OnboardingScreen(
-            onGenerateIdentity = { generateIdentity() },
-            onTermsAccepted = {
-                runCatching {
-                    // 明文存储：同意发生在口令设置之前，那时没有可用的加密密钥。
-                    val consentStore = com.schat.android.data.store.PlainFileStore(
-                        java.io.File(context.filesDir, "legal-consent.txt")
-                    )
-                    val documents = com.schat.android.core.legal.LegalDocuments.parseAll(
-                        com.schat.android.ui.legal.readAllLegalTexts(context)
-                    )
-                    val needed = documents.filter {
-                        it.id in com.schat.android.core.legal.LegalDocuments.REQUIRING_CONSENT
-                    }
-                    // 有一份读不到或解析不出，就不放行：同意一份看不见的协议不是同意。
-                    check(needed.size == com.schat.android.core.legal.LegalDocuments.REQUIRING_CONSENT.size) {
-                        "有协议文本读不到，无法记录确认"
-                    }
-                    com.schat.android.core.legal.LegalConsentStore(consentStore).save(
-                        com.schat.android.core.legal.LegalConsent(
-                            acceptedVersions = needed.associate { it.id to it.version },
-                            acceptedAtMillis = System.currentTimeMillis(),
+    // 三个阶段（引导 / 解锁 / 应用）之间的切换用一个 200ms 的淡入淡出。
+    FadeSwap(target = stage) { current ->
+        when (current) {
+            Stage.Setup -> OnboardingScreen(
+                onGenerateIdentity = { generateIdentity() },
+                onTermsAccepted = {
+                    runCatching {
+                        // 明文存储：同意发生在口令设置之前，那时没有可用的加密密钥。
+                        val consentStore = com.schat.android.data.store.PlainFileStore(
+                            java.io.File(context.filesDir, "legal-consent.txt")
                         )
-                    )
-                }
-            },
-            onFinished = { state ->
-                completeSetup(runtime, state)
-                    .onSuccess { stage = it }
-                    // On failure the stage is left alone, so the user stays on the
-                    // step they were on with the message visible.
-                    .map { }
-            },
-        )
+                        val documents = com.schat.android.core.legal.LegalDocuments.parseAll(
+                            com.schat.android.ui.legal.readAllLegalTexts(context)
+                        )
+                        val needed = documents.filter {
+                            it.id in com.schat.android.core.legal.LegalDocuments.REQUIRING_CONSENT
+                        }
+                        // 有一份读不到或解析不出，就不放行：同意一份看不见的协议不是同意。
+                        check(needed.size == com.schat.android.core.legal.LegalDocuments.REQUIRING_CONSENT.size) {
+                            "有协议文本读不到，无法记录确认"
+                        }
+                        com.schat.android.core.legal.LegalConsentStore(consentStore).save(
+                            com.schat.android.core.legal.LegalConsent(
+                                acceptedVersions = needed.associate { it.id to it.version },
+                                acceptedAtMillis = System.currentTimeMillis(),
+                            )
+                        )
+                    }
+                },
+                onFinished = { state ->
+                    completeSetup(runtime, state)
+                        .onSuccess { stage = it }
+                        // On failure the stage is left alone, so the user stays on the
+                        // step they were on with the message visible.
+                        .map { }
+                },
+            )
 
-        Stage.Locked -> UnlockScreen(
-            error = error,
-            onSubmit = { passphrase ->
-                error = null
-                stage = unlock(runtime, passphrase) { error = it }
-            },
-        )
+            Stage.Locked -> UnlockScreen(
+                error = error,
+                onSubmit = { passphrase ->
+                    error = null
+                    stage = unlock(runtime, passphrase) { error = it }
+                },
+            )
 
-        is Stage.Ready -> ChatRoute(profile = current.profile, store = current.store)
+            is Stage.Ready -> ChatRoute(profile = current.profile, store = current.store)
+        }
     }
 }
 
@@ -484,6 +492,9 @@ private fun ChatRoute(profile: ClientProfileData, store: EncryptedStore) {
     }
 
     ChatScreen(
+        // 从「选联系人」切到「会话」是一次换屏，用同一个 200ms 淡入淡出。
+        // 用状态本身当 key：对端身份变了就是换了一段会话，也应当有这次转场。
+        fadeKey = state.peerIdentityHex,
         state = state,
         myIdentity = myIdentity,
         serverUri = profile.serverUri,
@@ -519,52 +530,63 @@ private fun ChatRoute(profile: ClientProfileData, store: EncryptedStore) {
 private fun UnlockScreen(error: String?, onSubmit: (String) -> Unit) {
     var passphrase by remember { mutableStateOf("") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(
-            text = "解锁 SCHAT",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            text = "输入你的口令以解密本机数据。",
-            style = MaterialTheme.typography.bodyMedium,
-        )
+    ScreenBackground {
+        Column(modifier = Modifier.fillMaxSize()) {
+            ScreenHeader(
+                title = "解锁 SCHAT",
+                subtitle = "口令在本机派生密钥，服务器不保存任何能替你解密的东西。",
+                body = {
+                    // 这里不放品牌标记：顶栏本身就是品牌渐变，渐变块压在渐变底上会
+                    // 糊成一片。要说的是一件事实，那就只用一句话说它。
+                    StatusPill(text = "本机数据已加密")
+                },
+            )
 
-        error?.let { message ->
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                Text(
-                    text = message,
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                )
+            ContentColumn(gap = Dimens.BlockGap) {
+                error?.let { message ->
+                    GradientCard(
+                        container = MaterialTheme.colorScheme.errorContainer,
+                        borderBrush = SchatGradients.alertBorder(),
+                    ) {
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                    }
+                }
+
+                GradientCard {
+                    SectionLabel("输入口令")
+                    OutlinedTextField(
+                        value = passphrase,
+                        onValueChange = { passphrase = it },
+                        label = { Text("口令") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Done,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    GradientButton(
+                        text = "解锁",
+                        onClick = { onSubmit(passphrase) },
+                        enabled = passphrase.isNotEmpty(),
+                    )
+                }
+
+                GradientCard(container = MaterialTheme.colorScheme.surfaceContainerLow) {
+                    Text(
+                        text = "忘记口令无法找回：服务器不保存任何数据，也没有任何一方能替你解密。" +
+                            "如果你抄下了恢复码，可以在重装后用它在另一台设备上恢复。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
-
-        OutlinedTextField(
-            value = passphrase,
-            onValueChange = { passphrase = it },
-            label = { Text("口令") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Button(onClick = { onSubmit(passphrase) }, enabled = passphrase.isNotEmpty()) {
-            Text("解锁")
-        }
-
-        Text(
-            text = "忘记口令无法找回：服务器不保存任何数据，也没有任何一方能替你解密。" +
-                "如果你抄下了恢复码，可以在重装后用它在另一台设备上恢复。",
-            style = MaterialTheme.typography.bodySmall,
-        )
     }
 }

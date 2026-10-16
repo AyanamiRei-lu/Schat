@@ -2,10 +2,10 @@ package com.schat.android.ui.legal
 
 import android.content.Context
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -13,13 +13,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.schat.android.core.legal.LegalDocument
 import com.schat.android.core.legal.LegalDocuments
 import com.schat.android.ui.chat.MetadataWarning
+import com.schat.android.ui.theme.Dimens
+import com.schat.android.ui.ui.ContentColumn
+import com.schat.android.ui.ui.ScreenBackground
+import com.schat.android.ui.ui.ScreenHeader
+import com.schat.android.ui.ui.SectionLabel
 
 /**
  * 读取一份协议的全文。
@@ -55,6 +59,16 @@ fun readAllLegalTexts(context: Context): Map<String, String> =
  * 排版难看是可以接受的代价，改动了协议文本则不是。
  *
  * 所以这里直接显示原始字符，只保留换行。
+ *
+ * # 排版上唯一做的事
+ *
+ * 正文放进一个浅底卡片里，段落间距交给 `lineHeight`。这不是"美化协议"——
+ * 一行挨一行的密排在手机上会让人**跳过**它，而这一页存在的全部意义是让人读进去。
+ *
+ * @param embedded 当它嵌在别的界面里（引导流程的条款页、状态页）时为 true：
+ *   那时**不能**再铺一层全屏底色，也不能再套一个垂直滚动——同方向嵌套滚动在
+ *   Compose 里会抛 IllegalStateException，表现为闪退。此时只画标题栏与正文，
+ *   滚动交给宿主。
  */
 @Composable
 fun LegalScreen(
@@ -62,31 +76,52 @@ fun LegalScreen(
     text: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    embedded: Boolean = false,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        // 与所有会话界面一致：这条警告常驻且不可关闭。
-        MetadataWarning()
+    // 嵌在宿主里时不能用 fillMaxSize：宿主的滚动容器给子节点的最大高度是无限的，
+    // 而"填满一个无限高度"只会得到一团无法滚动的空白。
+    val rootModifier = if (embedded) modifier.fillMaxWidth() else modifier.fillMaxSize()
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onBack) { Text("返回") }
-            Text(
-                text = "${document.title} v${document.version}",
-                modifier = Modifier.weight(1f),
+    val body: @Composable () -> Unit = {
+        Column(modifier = rootModifier) {
+            ScreenHeader(
+                title = document.title,
+                subtitle = "版本 v${document.version} · 文本与仓库 docs/legal/ 逐字节相同",
+                onBack = onBack,
+                backLabel = "返回",
             )
-        }
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                // 滚动由调用方提供：这里再加一个 verticalScroll 会构成同方向嵌套，
-                // 而 Compose 对此会抛 IllegalStateException（表现为闪退）。
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) {
-            Text(text = text)
+            // 与所有会话界面一致：这条警告常驻且不可关闭。
+            MetadataWarning()
+
+            if (embedded) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Dimens.Lg, vertical = Dimens.Lg),
+                ) {
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            } else {
+                ContentColumn(vertical = Dimens.Lg) {
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
         }
+    }
+
+    if (embedded) {
+        body()
+    } else {
+        ScreenBackground(aurora = false) { body() }
     }
 }
 
@@ -104,10 +139,13 @@ fun LegalRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = Dimens.Xs),
     ) {
         TextButton(onClick = onOpen) {
-            Text("${document.title}（v${document.version}）")
+            Text(
+                text = "${document.title}（v${document.version}）",
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
     }
 }
@@ -117,10 +155,11 @@ fun LegalRow(
 fun LegalUnavailable(what: String) {
     Text(
         text = "无法读取$what。请重新安装应用，或到项目仓库查看对应文本。",
-        modifier = Modifier.padding(16.dp),
+        modifier = Modifier.padding(vertical = Dimens.Sm),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error,
     )
 }
-
 
 /**
  * 「条款与协议」一节：列出四份文档，点开阅读。
@@ -144,12 +183,14 @@ fun LegalSection(modifier: Modifier = Modifier) {
             text = texts[current.id].orEmpty(),
             onBack = { reading = null },
             modifier = modifier,
+            // 这一节嵌在状态页的滚动列里（见 MainActivity），滚动必须交给宿主。
+            embedded = true,
         )
         return
     }
 
-    Column(modifier = modifier) {
-        Text("条款与协议")
+    Column(modifier = modifier.fillMaxWidth()) {
+        SectionLabel("条款与协议")
 
         if (documents.isEmpty()) {
             // 一份都读不到时说出来，而不是显示一个空的列表——空列表看起来像

@@ -1,6 +1,6 @@
 package com.schat.android.ui.chat
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,11 +8,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import com.schat.android.ui.theme.Dimens
+import com.schat.android.ui.theme.SchatPalette
+import com.schat.android.ui.ui.ContentColumn
+import com.schat.android.ui.ui.GradientCard
+import com.schat.android.ui.ui.ScreenBackground
+import com.schat.android.ui.ui.ScreenHeader
+import com.schat.android.ui.ui.SectionLabel
 
 /**
  * 群列表里的一行。
@@ -52,54 +59,77 @@ fun GroupListScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        // 与群会话界面一致：这条警告常驻且不可关闭。
-        MetadataWarning()
+    ScreenBackground {
+        Column(modifier = modifier.fillMaxSize()) {
+            // 与群会话界面一致：这条警告常驻且不可关闭。
+            MetadataWarning()
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onBack) { Text("返回") }
-            Text(
-                text = "群组",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium,
+            ScreenHeader(
+                title = "群组",
+                subtitle = "本机保存了 ${groups.size} 个群；群名与成员由协议核心回答。",
+                onBack = onBack,
+                backLabel = "返回",
             )
-        }
 
-        if (groups.isEmpty()) {
-            Text(
-                text = "本机还没有群。\n在会话界面点「新建群」可以建一个。",
-                modifier = Modifier.padding(24.dp),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            return@Column
-        }
+            ContentColumn(vertical = Dimens.Lg, gap = Dimens.Md) {
+                if (groups.isEmpty()) {
+                    GradientCard {
+                        SectionLabel("还没有群")
+                        Text(
+                            text = "在会话界面点「新建群」可以建一个。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    return@ContentColumn
+                }
 
-        // 群的数量是个位数，用 Column 逐行列出，不引入惰性列表。
-        groups.forEach { group ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onOpen(group.groupIdHex) }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            ) {
-                Text(
-                    text = group.groupIdHex.take(8) + "…",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Text(
-                    // 成员数与 epoch 都是核心报出来的事实，界面只负责显示。
-                    // 负数表示核心读不懂这份快照——那种情况下说"状态不可用"，而不是显示一个
-                    // 看起来像真的"0 人"。
-                    text = if (group.memberCount < 0) {
-                        "状态不可用"
-                    } else {
-                        "${group.memberCount} 人 · epoch ${group.epoch}"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                // 群的数量是个位数，用 Column 逐行列出，不引入惰性列表。
+                groups.forEach { group ->
+                    GradientCard(onClick = { onOpen(group.groupIdHex) }) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = group.groupIdHex.take(8) + "…",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            val readable = group.memberCount >= 0
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Dimens.Sm),
+                            ) {
+                                Text(
+                                    // 成员数与 epoch 都是核心报出来的事实，界面只负责显示。
+                                    // 负数表示核心读不懂这份快照——那种情况下说"状态不可用"，而不是显示一个
+                                    // 看起来像真的"0 人"。
+                                    text = if (readable) {
+                                        "${group.memberCount} 人 · epoch ${group.epoch}"
+                                    } else {
+                                        "状态不可用"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (readable) {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    } else {
+                                        MaterialTheme.colorScheme.error
+                                    },
+                                )
+                                if (readable) {
+                                    Text(
+                                        text = "›",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = SchatPalette.Blue500,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

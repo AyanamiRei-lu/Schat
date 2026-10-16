@@ -12,33 +12,31 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.schat.android.app.SchatRoot
-import com.schat.android.ui.onboarding.OnboardingScreen
+import com.schat.android.ui.theme.Dimens
+import com.schat.android.ui.theme.SchatPalette
 import com.schat.android.ui.theme.SchatTheme
+import com.schat.android.ui.ui.ContentColumn
+import com.schat.android.ui.ui.GradientCard
+import com.schat.android.ui.ui.GradientLogoMark
+import com.schat.android.ui.ui.GradientWordmark
+import com.schat.android.ui.ui.KeyValueRow
+import com.schat.android.ui.ui.ScreenBackground
+import com.schat.android.ui.ui.ScreenHeader
+import com.schat.android.ui.ui.SectionLabel
+import com.schat.android.ui.ui.StatusPill
 
 /**
  * It hosts first-run setup, and the build diagnostics screen afterwards.
@@ -67,77 +65,63 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun BuildStatusScreen(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Header()
+    ScreenBackground(modifier = modifier) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            ScreenHeader(
+                title = AppInfo.NAME,
+                subtitle = stringResource(R.string.status_subtitle),
+                body = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.Md),
+                    ) {
+                        StatusPill(text = "v${AppInfo.VERSION}")
+                        StatusPill(text = "minSdk ${AppInfo.MIN_ANDROID}")
+                    }
+                },
+            )
 
-        StatusCard(
-            title = stringResource(R.string.section_done),
-            entries = AppInfo.implemented,
-            accent = MaterialTheme.colorScheme.primary,
-        )
+            ContentColumn(gap = Dimens.BlockGap) {
+                GradientCard {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.Md),
+                    ) {
+                        GradientLogoMark(letter = "S", size = 44.dp)
+                        Column {
+                            GradientWordmark(
+                                text = AppInfo.NAME,
+                                style = MaterialTheme.typography.headlineSmall,
+                            )
+                            Text(
+                                text = "端到端加密聊天 · 服务器只转发密文",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
 
-        StatusCard(
-            title = stringResource(R.string.section_pending),
-            entries = AppInfo.pending,
-            accent = MaterialTheme.colorScheme.tertiary,
-        )
+                    KeyValueRow(label = "单聊协议", value = AppInfo.PROTOCOL)
+                    KeyValueRow(label = "群聊协议", value = AppInfo.GROUP_PROTOCOL)
+                }
 
-        com.schat.android.ui.legal.LegalSection()
+                StatusCard(
+                    title = stringResource(R.string.section_done),
+                    entries = AppInfo.implemented,
+                    accent = SchatPalette.Blue500,
+                )
 
-        SecurityNotice()
-    }
-}
+                StatusCard(
+                    title = stringResource(R.string.section_pending),
+                    entries = AppInfo.pending,
+                    accent = SchatPalette.Red500,
+                )
 
-@Composable
-private fun Header() {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = AppInfo.NAME,
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            text = stringResource(R.string.status_subtitle),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = "v${AppInfo.VERSION} · minSdk ${AppInfo.MIN_ANDROID}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-    }
+                com.schat.android.ui.legal.LegalSection()
 
-    HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
-
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        KeyValue("单聊协议", AppInfo.PROTOCOL)
-        KeyValue("群聊协议", AppInfo.GROUP_PROTOCOL)
-    }
-}
-
-@Composable
-private fun KeyValue(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            modifier = Modifier.width(88.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Medium,
-        )
+                SecurityNotice()
+            }
+        }
     }
 }
 
@@ -147,63 +131,39 @@ private fun StatusCard(
     entries: List<String>,
     accent: Color,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+    GradientCard {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimens.Sm),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(accent),
-                )
-                Text(
-                    text = title,
-                    modifier = Modifier.padding(start = 8.dp),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(accent),
+            )
+            SectionLabel(title, accent = accent)
+        }
 
-            entries.forEach { entry ->
-                Text(
-                    text = "· $entry",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
+        entries.forEach { entry ->
+            Text(
+                text = "· $entry",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }
 
 @Composable
 private fun SecurityNotice() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.notice_title),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = stringResource(R.string.notice_body),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
+    GradientCard(container = MaterialTheme.colorScheme.surfaceContainerLow) {
+        SectionLabel(stringResource(R.string.notice_title))
+        Text(
+            text = stringResource(R.string.notice_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

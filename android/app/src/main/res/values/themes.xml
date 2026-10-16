@@ -3,9 +3,12 @@
   Compose draws the entire UI, so this XML theme only needs to give the window a
   sensible background before the first frame. Material3's colour scheme lives in
   Kotlin (ui/theme/Theme.kt), not here.
+
+  The colour is the same pure white the light scheme uses as its canvas, so the
+  very first frame does not flash a different colour than the UI that replaces it.
 -->
 <resources>
     <style name="Theme.Schat" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#FFFBFE</item>
+        <item name="android:windowBackground">#FFFFFFFF</item>
     </style>
 </resources>

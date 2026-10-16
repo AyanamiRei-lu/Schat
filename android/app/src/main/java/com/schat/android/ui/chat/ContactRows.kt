@@ -1,6 +1,5 @@
 package com.schat.android.ui.chat
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,15 +7,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,12 +23,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.schat.android.core.contacts.Contact
+import com.schat.android.ui.theme.Dimens
+import com.schat.android.ui.ui.GradientAvatar
+import com.schat.android.ui.ui.UnreadPill
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -105,13 +103,17 @@ private fun ContactRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onOpen)
-            .padding(horizontal = 4.dp, vertical = 10.dp),
+            .padding(horizontal = Dimens.Md, vertical = Dimens.Md),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.Md),
     ) {
-        IdentityAvatar(contact)
+        GradientAvatar(
+            label = contact.displayName,
+            hue = hueOf(contact.identityHex),
+            size = 44.dp,
+        )
 
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -139,7 +141,7 @@ private fun ContactRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                if (contact.unread > 0) UnreadBadge(contact.unread)
+                if (contact.unread > 0) UnreadPill(contact.unread)
             }
 
             if (!contact.isNamed) {
@@ -178,50 +180,14 @@ private fun ContactRow(
 }
 
 /**
- * A circle with the first character of the display name.
+ * 一个稳定的身份色相。
  *
- * The colour is derived from the identity key, so it is stable across restarts and devices
- * — but it is a decoration, not an identifier. Two contacts can share a colour, and the
- * tone says nothing about trust; treating it as a fingerprint would be a mistake the UI
- * must not invite.
+ * 颜色由身份公钥派生，所以同一个人在本机永远是同一个颜色，重启和换设备都不变——
+ * 但它是**装饰**，不是标识：两个联系人可能撞色，而且它不代表任何信任关系。
+ * 真正的比对靠安全码，不靠这个颜色。
  */
-@Composable
-private fun IdentityAvatar(contact: Contact) {
-    val hue = contact.identityHex.take(2).toIntOrNull(16)?.times(360f)?.div(256f) ?: 200f
-    val colour = Color.hsv(hue, 0.35f, 0.72f)
-
-    Box(
-        modifier = Modifier
-            .size(42.dp)
-            .clip(CircleShape)
-            .background(colour),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = contact.displayName.take(1).uppercase(),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-        )
-    }
-}
-
-/** The unread count. */
-@Composable
-private fun UnreadBadge(count: Int) {
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 6.dp),
-    ) {
-        Text(
-            text = if (count > 99) "99+" else count.toString(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-        )
-    }
-}
+private fun hueOf(identityHex: String): Float =
+    identityHex.take(2).toIntOrNull(16)?.times(360f)?.div(256f) ?: 200f
 
 /** The last message, or a note that there is not one yet. */
 private fun previewLine(contact: Contact): String = when {

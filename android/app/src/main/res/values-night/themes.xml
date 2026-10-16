@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dark counterpart of values/themes.xml.
+
+  The background is pure black, matching what the dark colour scheme paints, so a
+  cold start does not briefly show a grey window before Compose takes over.
+-->
 <resources>
     <style name="Theme.Schat" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#101418</item>
+        <item name="android:windowBackground">#FF000000</item>
     </style>
 </resources>

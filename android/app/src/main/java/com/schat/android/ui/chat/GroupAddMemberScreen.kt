@@ -1,17 +1,33 @@
 package com.schat.android.ui.chat
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.schat.android.ui.theme.Dimens
+import com.schat.android.ui.theme.OnGradient
+import com.schat.android.ui.theme.SchatGradients
+import com.schat.android.ui.theme.SchatPalette
+import com.schat.android.ui.ui.ContentColumn
+import com.schat.android.ui.ui.GradientCard
+import com.schat.android.ui.ui.ScreenBackground
+import com.schat.android.ui.ui.ScreenHeader
+import com.schat.android.ui.ui.SectionLabel
 
 /**
  * 选一个人加进群。
@@ -48,36 +64,83 @@ fun GroupAddMemberScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        // 与所有会话界面一致：这条警告常驻且不可关闭。
-        MetadataWarning()
+    ScreenBackground {
+        Column(modifier = modifier.fillMaxSize()) {
+            // 与所有会话界面一致：这条警告常驻且不可关闭。
+            MetadataWarning()
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onBack) { Text("返回") }
-            Text(text = "加人进群", modifier = Modifier.weight(1f))
-        }
-
-        if (candidates.isEmpty()) {
-            // 两种空都落在这里：还没有任何联系人，或联系人都已经在群里。
-            Text(
-                text = "没有可以加入的联系人。\n" +
-                    "群里的成员已经都在这里了；要加新人，先在会话界面与对方建立会话。",
-                modifier = Modifier.padding(24.dp),
+            ScreenHeader(
+                title = "加人进群",
+                subtitle = "身份由签名密钥决定：备注名只影响显示，不影响加进来的是谁。",
+                onBack = onBack,
+                backLabel = "返回",
             )
-            return@Column
-        }
 
-        candidates.forEach { candidate ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onPick(candidate.identityHex) }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            ) {
-                Text(text = candidate.displayName)
+            ContentColumn(vertical = Dimens.Lg, gap = Dimens.Md) {
+                if (candidates.isEmpty()) {
+                    // 两种空都落在这里：还没有任何联系人，或联系人都已经在群里。
+                    GradientCard {
+                        SectionLabel("没有可以加入的联系人")
+                        Text(
+                            text = "群里的成员已经都在这里了；要加新人，先在会话界面与对方建立会话。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    return@ContentColumn
+                }
+
+                candidates.forEach { candidate ->
+                    GradientCard(
+                        onClick = { onPick(candidate.identityHex) },
+                        contentPadding = Dimens.Lg,
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Dimens.Md),
+                        ) {
+                            // 渐变小方块里放候选人的身份前缀首字母：它不表示身份，
+                            // 只让人在一列里能快速区分行。
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(RoundedCornerShape(percent = 32))
+                                    .background(SchatGradients.brand()),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = candidate.displayName.take(1).uppercase(),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = OnGradient,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = candidate.displayName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = candidate.identityHex.take(16) + "…",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+
+                            Text(
+                                text = "加入 ›",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = SchatPalette.Blue500,
+                            )
+                        }
+                    }
+                }
             }
         }
     }

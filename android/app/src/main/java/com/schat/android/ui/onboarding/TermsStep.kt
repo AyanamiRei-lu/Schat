@@ -1,12 +1,9 @@
 package com.schat.android.ui.onboarding
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -14,7 +11,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -23,6 +19,10 @@ import com.schat.android.core.legal.LegalDocuments
 import com.schat.android.ui.legal.LegalScreen
 import com.schat.android.ui.legal.LegalUnavailable
 import com.schat.android.ui.legal.readAllLegalTexts
+import com.schat.android.ui.theme.Dimens
+import com.schat.android.ui.ui.CheckOption
+import com.schat.android.ui.ui.GradientButton
+import com.schat.android.ui.ui.SectionLabel
 
 /**
  * 引导流程的**第一步**：阅读并确认协议。
@@ -71,6 +71,8 @@ fun TermsStep(
             text = texts[current.id].orEmpty(),
             onBack = { reading = null },
             modifier = modifier,
+            // 这一页嵌在引导流程的滚动列里：不能再铺全屏底色，也不能再套一层滚动。
+            embedded = true,
         )
         return
     }
@@ -80,9 +82,16 @@ fun TermsStep(
             .fillMaxWidth()
             // 滚动由调用方提供：这里再加一个 verticalScroll 会构成同方向嵌套，
             // 而 Compose 对此会抛 IllegalStateException（表现为闪退）。
-            .padding(16.dp),
+            .padding(top = Dimens.Xs),
     ) {
-        Text("使用前请阅读并同意以下条款")
+        SectionLabel("阅读并同意以下条款")
+
+        Text(
+            text = "《Schat 服务器运营须知》约束的是自行部署服务器的人，因此不需要在这里确认；" +
+                "它列在下方供你随时阅读。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
         if (missing.isNotEmpty()) {
             // 读不出来就说读不出来，并且不放行。空白页配上可点的"同意"是最坏的一种。
@@ -92,47 +101,32 @@ fun TermsStep(
 
         documents.forEach { doc ->
             TextButton(onClick = { reading = doc }) {
-                Text("阅读《${doc.title}》（v${doc.version}）")
+                Text(
+                    text = "阅读《${doc.title}》（v${doc.version}）",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { acceptedUserTerms = !acceptedUserTerms }
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Checkbox(checked = acceptedUserTerms, onCheckedChange = { acceptedUserTerms = it })
-            Text("我已阅读并同意《Schat 用户协议》与《Schat 隐私政策》")
-        }
+        CheckOption(
+            checked = acceptedUserTerms,
+            text = "我已阅读并同意《Schat 用户协议》与《Schat 隐私政策》",
+            onCheckedChange = { acceptedUserTerms = it },
+        )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { guardianConfirmed = !guardianConfirmed }
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Checkbox(checked = guardianConfirmed, onCheckedChange = { guardianConfirmed = it })
-            Text(
-                "如使用者为未成年人，其监护人已阅读并同意《Schat 儿童个人信息保护规则》" +
-                    "，并同意在监护下使用"
-            )
-        }
+        CheckOption(
+            checked = guardianConfirmed,
+            text = "如使用者为未成年人，其监护人已阅读并同意《Schat 儿童个人信息保护规则》，" +
+                "并同意在监护下使用",
+            onCheckedChange = { guardianConfirmed = it },
+        )
 
-        Button(
+        GradientButton(
+            text = "继续",
             onClick = onAccepted,
             // 两个都要勾上。下面那一条不是"可选的礼貌"，它是儿童规则要求监护人做的确认。
             enabled = acceptedUserTerms && guardianConfirmed,
-        ) {
-            Text("继续")
-        }
-
-        Text(
-            "《Schat 服务器运营须知》约束的是自行部署服务器的人，因此不需要在这里确认；" +
-                "它列在上方供你随时阅读。",
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = Dimens.Sm),
         )
     }
 }

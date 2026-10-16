@@ -63,6 +63,12 @@
 | 客户端编译 | `./gradlew :app:assembleDebug` | 产出 **37.4 MB** debug APK |
 | CI | GitHub Actions | 三个 job；Go 两个为绿 |
 
+> **界面层（2026 年的一次 UI 改版）**：配色收敛到白/蓝/黑三族、加了渐变与动画、
+> 所有界面改为共用 `ui/ui/Components.kt` 的零件。验证方式是
+> `./gradlew :app:assembleDebug` 与 `:app:compileDebugKotlin --rerun-tasks`（全量重编）
+> 均通过、APK 仍为 37.4 MB。**它没有被任何自动化测试覆盖，也没有在真机上跑过**——
+> 界面在这个项目里一直是"只能靠真机验证"的那一类（见第 3.2 节）。
+
 ### 2.1 群聊的四个"跟随"场景（这是 M4 的核心）
 
 MLS 里最容易出错、也最难发现的，是"某个成员在群变化之后还能不能继续待下去"。这四个场景**各有一条端到端测试**，都在 `protocol/mobile/` 下：
@@ -298,7 +304,24 @@ go build ./... && go test ./...
 | `ui/chat/GroupAddMemberScreen.kt` | 选一个人加进群 |
 | `ui/qr/QrImage.kt` | 渲染二维码模块矩阵 |
 | `ui/qr/QrScannerScreen.kt` | 相机扫码（**未在真机验证**） |
-| `ui/theme/Theme.kt` | 主题 |
+| `ui/theme/Theme.kt` | 主题：白/蓝/黑三族的 Material3 配色、字阶、形状 |
+| `ui/theme/DesignTokens.kt` | 颜色、间距、圆角三个令牌对象；**界面里的裸 `.dp` 和 `Color(0x…)` 应当只有这一处** |
+| `ui/theme/Gradients.kt` | 全部渐变（页面底、顶栏、按钮、气泡、卡片描边）与"呼吸"动画值 |
+| `ui/ui/Components.kt` | 界面零件：`ScreenBackground`／`ScreenHeader`／`GradientCard`／`GradientButton`／`GhostButton`／`BarAction`／`StatusPill`／`UnreadPill`／`GradientAvatar`／`ProgressBar`／`CheckOption`／`MonoBlock`／`FadeSwap` |
+
+**关于界面层本身**（这一段是给下一位改界面的人的）：
+
+- **所有颜色只来自 `DesignTokens.kt`**，且只用白、蓝、黑三族；红色是语义色（错误、失败、
+  元数据警告），不作为装饰。没有主题引擎，也没有动态取色——能重新给界面上色的通道，
+  同时也是能用来伪装界面的通道。
+- **动画只动颜色、位移与绘制坐标**，不动布局尺寸（唯二的例外是 `ProgressBar` 的填充宽度
+  和 `GradientButton` 的按钮高度）。布局尺寸的动画会带来整屏重排，那看起来是卡，不是流畅。
+  时长：转场 200ms、气泡入场 240ms、按压反馈 140–180ms、背景呼吸 12–14 秒。
+- **换屏动画的键必须是"真的换了一屏"**：`SchatRoot` 用 `Stage`，`ChatScreen` 用对端身份。
+  用连接状态当键会让界面随每一次状态更新闪烁。
+- **改过界面代码后必须 `--rerun-tasks`**（见第 10.3 节），并且 `MaterialTheme.shapes` 的类型
+  是 Material3 自己的 `Shapes`——往它上面加属性是不行的，需要胶囊形时显式用
+  `SchatShapes.Pill`。
 
 ### 7.3 构建与测试
 

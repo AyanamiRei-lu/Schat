@@ -1,20 +1,36 @@
 package com.schat.android.ui.chat
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.ui.Alignment
-import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.schat.android.chat.ChatMessage
 import com.schat.android.chat.ChatState
 import com.schat.android.chat.DeliveryState
 import com.schat.android.core.groups.GroupMessage
+import com.schat.android.ui.theme.Dimens
+import com.schat.android.ui.theme.SchatPalette
+import com.schat.android.ui.theme.SchatShapes
+import com.schat.android.ui.ui.BarAction
+import com.schat.android.ui.ui.ScreenBackground
+import com.schat.android.ui.ui.ScreenHeader
+import com.schat.android.ui.ui.SectionLabel
 
 /**
  * 群会话界面。
@@ -64,42 +80,99 @@ fun GroupScreen(
     members: List<String>,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        // 常驻，不可关闭。
-        MetadataWarning()
+    ScreenBackground(aurora = false) {
+        Column(modifier = modifier.fillMaxSize()) {
+            // 常驻，不可关闭。
+            MetadataWarning()
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onBack) {
-                Text("返回")
-            }
-            Text(text = groupName, modifier = Modifier.weight(1f))
-            TextButton(onClick = onAddMember) {
-                Text("加人")
-            }
+            ScreenHeader(
+                title = groupName,
+                subtitle = "本机保存的成员名单 · 共 ${members.size} 人",
+                onBack = onBack,
+                backLabel = "返回",
+                actions = {
+                    BarAction(text = "加人", onClick = onAddMember)
+                },
+            )
+
+            // 群里是谁。
+            //
+            // 完整名单在这里逐行展开，而不是塞进标题里：一个十人的群，标题里只能容下
+            // 三个名字，剩下的要靠"等七人"去猜。名单来自协议核心，界面不解析群状态。
+            MemberStrip(members = members)
+
+            MessageList(
+                state = ChatState(messages = messages.mapIndexed { index, message -> message.toChatMessage(index) }),
+                modifier = Modifier.weight(1f),
+            )
+
+            Composer(onSend = onSend)
         }
-
-        // 群里是谁。
-        //
-        // 群名不是用户起的，而是由成员拼出来的（见调用方）：对用户来说"我、张三"比
-        // "群 1"或一串标识更有信息量，而它不会说谎——名单就是群状态里的名单。
-        Text(
-            text = members.joinToString("、"),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-
-        MessageList(
-            state = ChatState(messages = messages.mapIndexed { index, message -> message.toChatMessage(index) }),
-            modifier = Modifier.weight(1f),
-        )
-
-        Composer(onSend = onSend)
     }
 }
+
+/**
+ * 成员名单：一行胶囊。
+ *
+ * 名单在标题下面展开，而不是塞进标题里——一个十人的群，标题里只能容下三个名字，
+ * 剩下的要靠"等七人"去猜。人数多了就截断，并用「+N」说明还有多少；完整名单随时
+ * 可以由协议核心重新问一次（见调用方）。
+ */
+@Composable
+private fun MemberStrip(members: List<String>) {
+    if (members.isEmpty()) return
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.72f))
+            .padding(horizontal = Dimens.Md, vertical = Dimens.Sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimens.Sm),
+    ) {
+        SectionLabel("成员")
+        members.take(MEMBER_CHIP_LIMIT).forEach { name ->
+            Row(
+                modifier = Modifier
+                    .clip(SchatShapes.Pill)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .padding(horizontal = Dimens.Md, vertical = Dimens.Xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Dimens.Sm),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(SchatPalette.Blue500),
+                )
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 96.dp),
+                )
+            }
+        }
+        if (members.size > MEMBER_CHIP_LIMIT) {
+            Text(
+                text = "+${members.size - MEMBER_CHIP_LIMIT}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * 一次最多显示几个成员胶囊。
+ *
+ * 上限不是"排版好看"，而是不让一个五十人的群把消息区挤到屏幕外面：
+ * 多出来的人数由「+N」说明，而完整名单随时可以由协议核心重新问一次。
+ */
+private const val MEMBER_CHIP_LIMIT = 6
 
 /**
  * 把一条群消息映射成会话界面认识的消息。

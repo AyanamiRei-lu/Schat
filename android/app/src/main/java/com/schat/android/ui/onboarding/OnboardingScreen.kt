@@ -5,13 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -20,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -32,6 +27,20 @@ import com.schat.android.core.onboarding.OnboardingStep
 import com.schat.android.core.qr.QrPayload
 import com.schat.android.ui.qr.QrScannerScreen
 import com.schat.android.core.onboarding.RecoveryCode
+import com.schat.android.ui.theme.Dimens
+import com.schat.android.ui.theme.SchatGradients
+import com.schat.android.ui.theme.SchatPalette
+import com.schat.android.ui.ui.ContentColumn
+import com.schat.android.ui.ui.GhostButton
+import com.schat.android.ui.ui.GradientButton
+import com.schat.android.ui.ui.GradientCard
+import com.schat.android.ui.ui.GradientLogoMark
+import com.schat.android.ui.ui.MonoBlock
+import com.schat.android.ui.ui.ProgressBar
+import com.schat.android.ui.ui.ScreenBackground
+import com.schat.android.ui.ui.ScreenHeader
+import com.schat.android.ui.ui.SectionLabel
+import com.schat.android.ui.ui.StatusPill
 
 /**
  * The first-run flow.
@@ -61,7 +70,6 @@ fun OnboardingScreen(
      */
     onTermsAccepted: () -> Result<Unit>,
     onFinished: (OnboardingState) -> Result<Unit>,
-    modifier: Modifier = Modifier,
 ) {
     var state by remember { mutableStateOf(OnboardingState()) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -72,106 +80,109 @@ fun OnboardingScreen(
     // would compromise the other.
     val secureRandom = remember { java.security.SecureRandom() }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(
-            text = "设置 SCHAT",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            text = "第 ${state.step.ordinal + 1} / ${OnboardingStep.values().size} 步 · ${state.step.title()}",
-            style = MaterialTheme.typography.bodySmall,
-        )
+    val stepCount = OnboardingStep.values().size
+    val stepIndex = state.step.ordinal
 
-        error?.let { message ->
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                Text(
-                    text = message,
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                )
-            }
-        }
-
-        when (state.step) {
-            OnboardingStep.TERMS -> TermsStep(
-                onAccepted = {
-                    error = null
-                    // 先把确认记录落盘，再推进状态机：反过来的话，一次写入失败就会让
-                    // 用户"以为同意了"而记录并不存在，下次启动又回到这一页。
-                    onTermsAccepted()
-                        .mapCatching { state.termsAccepted().getOrThrow() }
-                        .onSuccess { state = it }
-                        .onFailure { error = it.message ?: "无法保存确认记录" }
+    ScreenBackground {
+        Column(modifier = Modifier.fillMaxSize()) {
+            ScreenHeader(
+                title = "设置 SCHAT",
+                subtitle = "身份、口令与服务器都只在这台设备上生成；服务器不保存任何一项。",
+                body = {
+                    StatusPill(
+                        text = "第 ${stepIndex + 1} / $stepCount 步 · ${state.step.title()}",
+                    )
+                    ProgressBar(fraction = (stepIndex + 1).toFloat() / stepCount)
                 },
             )
 
-            OnboardingStep.IDENTITY -> IdentityStep(
-                identityLabel = identityLabel,
-                onGenerate = {
-                    error = null
-                    onGenerateIdentity()
-                        .onSuccess { identityLabel = it }
-                        .onFailure { error = it.message ?: "生成身份失败" }
-                },
-                onNext = {
-                    state.identityCreated()
-                        .onSuccess { state = it }
-                        .onFailure { error = it.message }
-                },
-            )
+            ContentColumn(gap = Dimens.BlockGap) {
+                error?.let { message ->
+                    GradientCard(
+                        container = MaterialTheme.colorScheme.errorContainer,
+                        borderBrush = SchatGradients.alertBorder(),
+                    ) {
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                    }
+                }
 
-            OnboardingStep.PASSPHRASE -> PassphraseStep(
-                onSubmit = { pass, confirm ->
-                    error = null
-                    val seed = ByteArray(32).also { secureRandom.nextBytes(it) }
-                    state.setPassphrase(pass, confirm, seed)
-                        .onSuccess { state = it }
-                        .onFailure { error = it.message }
-                },
-            )
+                when (state.step) {
+                    OnboardingStep.TERMS -> TermsStep(
+                        onAccepted = {
+                            error = null
+                            // 先把确认记录落盘，再推进状态机：反过来的话，一次写入失败就会让
+                            // 用户"以为同意了"而记录并不存在，下次启动又回到这一页。
+                            onTermsAccepted()
+                                .mapCatching { state.termsAccepted().getOrThrow() }
+                                .onSuccess { state = it }
+                                .onFailure { error = it.message ?: "无法保存确认记录" }
+                        },
+                    )
 
-            OnboardingStep.RECOVERY -> RecoveryStep(
-                state = state,
-                onSubmit = { typed ->
-                    error = null
-                    val indices = state.confirmationIndices()
-                    state.confirmRecovery(indices, typed)
-                        .onSuccess { state = it }
-                        .onFailure { error = it.message }
-                },
-            )
+                    OnboardingStep.IDENTITY -> IdentityStep(
+                        identityLabel = identityLabel,
+                        onGenerate = {
+                            error = null
+                            onGenerateIdentity()
+                                .onSuccess { identityLabel = it }
+                                .onFailure { error = it.message ?: "生成身份失败" }
+                        },
+                        onNext = {
+                            state.identityCreated()
+                                .onSuccess { state = it }
+                                .onFailure { error = it.message }
+                        },
+                    )
 
-            OnboardingStep.SERVER -> ServerStep(
-                onSubmit = { raw ->
-                    error = null
-                    state.setServer(raw)
-                        .mapCatching { next ->
-                            // Persisting can still fail, for example when the vault
-                            // cannot be created on this device. If it does, the step
-                            // must not advance: the user has a passphrase and a
-                            // recovery code already entered, and restarting the flow
-                            // would discard both.
-                            onFinished(next).getOrThrow()
-                            next
-                        }
-                        .onSuccess { state = it }
-                        .onFailure { error = it.message }
-                },
-            )
+                    OnboardingStep.PASSPHRASE -> PassphraseStep(
+                        onSubmit = { pass, confirm ->
+                            error = null
+                            val seed = ByteArray(32).also { secureRandom.nextBytes(it) }
+                            state.setPassphrase(pass, confirm, seed)
+                                .onSuccess { state = it }
+                                .onFailure { error = it.message }
+                        },
+                    )
 
-            OnboardingStep.READY -> {
-                // The screen is finished; the caller swaps it out. This branch exists
-                // only so the when is exhaustive.
-                Text("配置完成")
+                    OnboardingStep.RECOVERY -> RecoveryStep(
+                        state = state,
+                        onSubmit = { typed ->
+                            error = null
+                            val indices = state.confirmationIndices()
+                            state.confirmRecovery(indices, typed)
+                                .onSuccess { state = it }
+                                .onFailure { error = it.message }
+                        },
+                    )
+
+                    OnboardingStep.SERVER -> ServerStep(
+                        onSubmit = { raw ->
+                            error = null
+                            state.setServer(raw)
+                                .mapCatching { next ->
+                                    // Persisting can still fail, for example when the vault
+                                    // cannot be created on this device. If it does, the step
+                                    // must not advance: the user has a passphrase and a
+                                    // recovery code already entered, and restarting the flow
+                                    // would discard both.
+                                    onFinished(next).getOrThrow()
+                                    next
+                                }
+                                .onSuccess { state = it }
+                                .onFailure { error = it.message }
+                        },
+                    )
+
+                    OnboardingStep.READY -> {
+                        // The screen is finished; the caller swaps it out. This branch exists
+                        // only so the when is exhaustive.
+                        Text("配置完成")
+                    }
+                }
             }
         }
     }
@@ -192,27 +203,42 @@ private fun IdentityStep(
     onGenerate: () -> Unit,
     onNext: () -> Unit,
 ) {
+    SectionLabel("第一步 · 生成身份", accent = SchatPalette.Blue500)
+
     Text(
         text = "SCHAT 没有账号也没有密码。你的身份是这台设备上生成的一对密钥，" +
             "私钥永远不会离开本机。",
         style = MaterialTheme.typography.bodyMedium,
     )
 
-    Button(onClick = onGenerate) { Text("生成身份密钥") }
+    if (identityLabel.isEmpty()) {
+        GradientButton(text = "生成身份密钥", onClick = onGenerate)
+        return
+    }
 
-    if (identityLabel.isNotEmpty()) {
-        Card {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text("身份指纹", style = MaterialTheme.typography.labelMedium)
+    GradientCard {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimens.Md),
+        ) {
+            GradientLogoMark(letter = "ID", size = 38.dp)
+            Column {
                 Text(
-                    text = identityLabel,
+                    text = "身份指纹",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "与对方当面核对时，比对的应当是安全码，不是这个指纹。",
                     style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-        Button(onClick = onNext) { Text("下一步") }
+        MonoBlock(text = identityLabel)
     }
+
+    GradientButton(text = "下一步", onClick = onNext)
 }
 
 @Composable
@@ -220,16 +246,30 @@ private fun PassphraseStep(onSubmit: (String, String) -> Unit) {
     var passphrase by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
 
+    SectionLabel("第二步 · 设置口令", accent = SchatPalette.Blue500)
+
     Text(
         text = "口令用于加密本机数据库，并与设备的安全芯片共同保护你的密钥。",
         style = MaterialTheme.typography.bodyMedium,
     )
-    Text(
-        text = "⚠️ 没有「找回口令」这回事。服务器不保存任何数据，忘记口令就意味着数据永久丢失——" +
-            "请务必同时抄下下一步的恢复码。",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.error,
-    )
+
+    GradientCard(
+        container = MaterialTheme.colorScheme.errorContainer,
+        borderBrush = SchatGradients.alertBorder(),
+    ) {
+        Text(
+            text = "⚠️ 没有「找回口令」这回事",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+        )
+        Text(
+            text = "服务器不保存任何数据，忘记口令就意味着数据永久丢失——" +
+                "请务必同时抄下下一步的恢复码。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+        )
+    }
 
     OutlinedTextField(
         value = passphrase,
@@ -250,10 +290,11 @@ private fun PassphraseStep(onSubmit: (String, String) -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     )
 
-    Button(
+    GradientButton(
+        text = "继续",
         onClick = { onSubmit(passphrase, confirmation) },
         enabled = passphrase.isNotEmpty() && confirmation.isNotEmpty(),
-    ) { Text("继续") }
+    )
 }
 
 @Composable
@@ -261,31 +302,26 @@ private fun RecoveryStep(state: OnboardingState, onSubmit: (List<String>) -> Uni
     val indices = state.confirmationIndices()
     val inputs = remember(state.step) { mutableStateOf(List(indices.size) { "" }) }
 
+    SectionLabel("第三步 · 抄写恢复码", accent = SchatPalette.Blue500)
+
     Text(
-        text = "请把下面 24 个单词抄在纸上并妥善保管。",
+        text = "请把下面 24 个单词抄在纸上并妥善保管。" +
+            "这是换机时唯一能恢复数据的方式，也是唯一能救回忘记口令后的数据的途径。" +
+            "不要截图，不要存在手机里。",
         style = MaterialTheme.typography.bodyMedium,
     )
-    Text(
-        text = "这是换机时唯一能恢复数据的方式，也是唯一能救回忘记口令后的数据的途径。" +
-            "不要截图，不要存在手机里。",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.error,
-    )
 
-    Card {
+    GradientCard(container = MaterialTheme.colorScheme.surfaceContainerLow) {
+        SectionLabel("恢复码 · 24 个单词")
         Text(
             text = RecoveryCode.format(state.recoveryWords),
-            modifier = Modifier.padding(12.dp),
             style = MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Medium,
         )
     }
 
-    Text(
-        text = "确认：请填写下面几个位置的单词",
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Bold,
-    )
+    SectionLabel("确认：请填写下面几个位置的单词")
 
     indices.forEachIndexed { position, index ->
         OutlinedTextField(
@@ -300,10 +336,11 @@ private fun RecoveryStep(state: OnboardingState, onSubmit: (List<String>) -> Uni
         )
     }
 
-    Button(
+    GradientButton(
+        text = "继续",
         onClick = { onSubmit(inputs.value) },
         enabled = inputs.value.all { it.isNotBlank() },
-    ) { Text("继续") }
+    )
 }
 
 @Composable
@@ -334,14 +371,15 @@ private fun ServerStep(onSubmit: (String) -> Unit) {
         return
     }
 
+    SectionLabel("最后一步 · 配置服务器", accent = SchatPalette.Blue500)
+
     Text(
         text = "把服务器的连接信息粘贴进来，或扫描另一台已配置好的设备上显示的「服务器连接码」。",
         style = MaterialTheme.typography.bodyMedium,
     )
-    Text(
+
+    MonoBlock(
         text = "格式形如 schat://connect?h=主机&p=端口&fp=证书指纹&ss=1",
-        style = MaterialTheme.typography.bodySmall,
-        fontFamily = FontFamily.Monospace,
     )
 
     OutlinedTextField(
@@ -357,6 +395,7 @@ private fun ServerStep(onSubmit: (String) -> Unit) {
         text = "自签名服务器必须带证书指纹（fp 参数）——没有指纹就无法确认连的是正确的服务器，" +
             "应用会拒绝这种配置。",
         style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 
     note?.let {
@@ -367,8 +406,17 @@ private fun ServerStep(onSubmit: (String) -> Unit) {
         )
     }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { onSubmit(raw) }, enabled = raw.isNotBlank()) { Text("连接") }
-        Button(onClick = { scanning = true }) { Text("扫码") }
+    Row(horizontalArrangement = Arrangement.spacedBy(Dimens.Md)) {
+        GradientButton(
+            text = "连接",
+            onClick = { onSubmit(raw) },
+            enabled = raw.isNotBlank(),
+            modifier = Modifier.weight(1f),
+        )
+        GhostButton(
+            text = "扫码",
+            onClick = { scanning = true },
+            modifier = Modifier.weight(1f),
+        )
     }
 }
