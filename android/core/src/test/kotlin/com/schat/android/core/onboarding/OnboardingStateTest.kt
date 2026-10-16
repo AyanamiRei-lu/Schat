@@ -18,7 +18,7 @@ class OnboardingStateTest {
     private fun seed(fill: Int = 7): ByteArray = ByteArray(32) { fill.toByte() }
 
     private fun atPassphrase(): OnboardingState =
-        OnboardingState().identityCreated().getOrThrow()
+        OnboardingState(step = OnboardingStep.IDENTITY).identityCreated().getOrThrow()
 
     private fun atRecovery(): OnboardingState =
         atPassphrase().setPassphrase(passphrase, passphrase, seed()).getOrThrow()
@@ -33,8 +33,8 @@ class OnboardingStateTest {
 
     @Test
     fun `starts at identity`() {
-        assertEquals(OnboardingStep.IDENTITY, OnboardingState().step)
-        assertFalse(OnboardingState().isComplete)
+        assertEquals(OnboardingStep.TERMS, OnboardingState().step)
+        assertFalse(OnboardingState(step = OnboardingStep.IDENTITY).isComplete)
     }
 
     @Test
@@ -45,7 +45,7 @@ class OnboardingStateTest {
 
     @Test
     fun `cannot set a passphrase before generating an identity`() {
-        assertTrue(OnboardingState().setPassphrase(passphrase, passphrase, seed()).isFailure)
+        assertTrue(OnboardingState(step = OnboardingStep.IDENTITY).setPassphrase(passphrase, passphrase, seed()).isFailure)
     }
 
     @Test

@@ -52,6 +52,22 @@ import com.schat.android.core.onboarding.RecoveryCode
 @Composable
 fun OnboardingScreen(
     onGenerateIdentity: () -> Result<String>,
+    /**
+     * 保存确认记录。
+     *
+     * # 为什么默认实现是"失败"，而不是一个空操作
+     *
+     * 同意发生在**保险库创建之前**（口令还没设），所以它不能走 EncryptedStore——
+     * 而 `LegalConsentStore` 目前正是那样构造的。这是一个真实的、尚未解决的冲突，
+     * 不是遗漏的接线：修法是给 `LegalConsentStore` 一个极小的键值接口，让 `:app`
+     * 提供一个明文文件实现（同意记录不是秘密：版本号与时间戳）。
+     *
+     * 在那之前，默认实现**返回失败**。空操作会让用户以为同意过了而什么都没存，
+     * 下次启动又回到这一页，而且失败得无声无息；返回失败会把原因显示出来。
+     */
+    onTermsAccepted: () -> Result<Unit> = {
+        Result.failure(IllegalStateException("条款确认尚未接线：同意记录需要在保险库建立之前保存"))
+    },
     onFinished: (OnboardingState) -> Result<Unit>,
     modifier: Modifier = Modifier,
 ) {
@@ -78,7 +94,7 @@ fun OnboardingScreen(
             color = MaterialTheme.colorScheme.primary,
         )
         Text(
-            text = "第 ${state.step.ordinal + 1} / 4 步 · ${state.step.title()}",
+            text = "第 ${state.step.ordinal + 1} / ${OnboardingStep.values().size} 步 · ${state.step.title()}",
             style = MaterialTheme.typography.bodySmall,
         )
 
@@ -94,6 +110,18 @@ fun OnboardingScreen(
         }
 
         when (state.step) {
+            OnboardingStep.TERMS -> TermsStep(
+                onAccepted = {
+                    error = null
+                    // 先把确认记录落盘，再推进状态机：反过来的话，一次写入失败就会让
+                    // 用户"以为同意了"而记录并不存在，下次启动又回到这一页。
+                    onTermsAccepted()
+                        .mapCatching { state.termsAccepted().getOrThrow() }
+                        .onSuccess { state = it }
+                        .onFailure { error = it.message ?: "无法保存确认记录" }
+                },
+            )
+
             OnboardingStep.IDENTITY -> IdentityStep(
                 identityLabel = identityLabel,
                 onGenerate = {
@@ -158,6 +186,7 @@ fun OnboardingScreen(
 }
 
 private fun OnboardingStep.title(): String = when (this) {
+    OnboardingStep.TERMS -> "阅读并同意条款"
     OnboardingStep.IDENTITY -> "生成身份密钥"
     OnboardingStep.PASSPHRASE -> "设置口令"
     OnboardingStep.RECOVERY -> "抄写恢复码"

@@ -18,6 +18,15 @@ import com.schat.android.core.crypto.Vault
  * UI to hide a button.
  */
 enum class OnboardingStep {
+    /**
+     * Read and accept the agreements.
+     *
+     * This is FIRST, before the identity even exists, because the children's privacy
+     * rule requires the guardian confirmation to happen "at first launch" — a prompt
+     * shown after the user has already created an identity is not that.
+     */
+    TERMS,
+
     /** Generate the long-term identity. */
     IDENTITY,
 
@@ -43,7 +52,7 @@ enum class OnboardingStep {
 const val RECOVERY_CONFIRMATION_WORDS = 3
 
 data class OnboardingState(
-    val step: OnboardingStep = OnboardingStep.IDENTITY,
+    val step: OnboardingStep = OnboardingStep.TERMS,
     val passphrase: String = "",
     val recoveryWords: List<String> = emptyList(),
     val server: ServerConfig? = null,
@@ -59,6 +68,13 @@ data class OnboardingState(
      * what matters here is that the step cannot be skipped, so a client can never
      * reach the passphrase screen with no identity to protect.
      */
+    fun termsAccepted(): Result<OnboardingState> {
+        if (step != OnboardingStep.TERMS) {
+            return fail("当前不在确认条款这一步")
+        }
+        return Result.success(copy(step = OnboardingStep.IDENTITY))
+    }
+
     fun identityCreated(): Result<OnboardingState> {
         if (step != OnboardingStep.IDENTITY) {
             return fail("当前不在生成身份这一步")

@@ -63,6 +63,23 @@ jobs:
         working-directory: server
         run: go build ./...
 
+      - name: 协议文本的两份副本必须逐字节相同
+        run: |
+          # 四份协议有两份副本：docs/legal/（GitHub 上可查、有 URL）与
+          # android/app/src/main/assets/legal/（App 里显示的那份）。
+          #
+          # 它们不一时，"用户能在仓库里查到的"就不是"App 里显示的"——而协议的全部
+          # 价值恰恰在于"你随时能查到我承诺过什么"。所以这条检查不是洁癖。
+          fail=0
+          for f in USER-AGREEMENT.md PRIVACY-POLICY.md CHILDREN-PRIVACY.md SERVER-OPERATOR-GUIDE.md; do
+            if ! cmp -s "docs/legal/$f" "android/app/src/main/assets/legal/$f"; then
+              echo "::error::$f 在 docs/legal 与 App 的 assets/legal 里不一致"
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "✓ 四份协议的两份副本逐字节相同"
+
       - name: 主张一：零第三方依赖
         working-directory: server
         run: |
