@@ -176,6 +176,30 @@ fun SchatRoot() {
     when (val current = stage) {
         Stage.Setup -> OnboardingScreen(
             onGenerateIdentity = { generateIdentity() },
+            onTermsAccepted = {
+                runCatching {
+                    // 明文存储：同意发生在口令设置之前，那时没有可用的加密密钥。
+                    val consentStore = com.schat.android.data.store.PlainFileStore(
+                        java.io.File(context.filesDir, "legal-consent.txt")
+                    )
+                    val documents = com.schat.android.core.legal.LegalDocuments.parseAll(
+                        com.schat.android.ui.legal.readAllLegalTexts(context)
+                    )
+                    val needed = documents.filter {
+                        it.id in com.schat.android.core.legal.LegalDocuments.REQUIRING_CONSENT
+                    }
+                    // 有一份读不到或解析不出，就不放行：同意一份看不见的协议不是同意。
+                    check(needed.size == com.schat.android.core.legal.LegalDocuments.REQUIRING_CONSENT.size) {
+                        "有协议文本读不到，无法记录确认"
+                    }
+                    com.schat.android.core.legal.LegalConsentStore(consentStore).save(
+                        com.schat.android.core.legal.LegalConsent(
+                            acceptedVersions = needed.associate { it.id to it.version },
+                            acceptedAtMillis = System.currentTimeMillis(),
+                        )
+                    )
+                }
+            },
             onFinished = { state ->
                 completeSetup(runtime, state)
                     .onSuccess { stage = it }

@@ -11,7 +11,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.schat.android.core.legal.LegalDocument
@@ -117,3 +122,45 @@ fun LegalUnavailable(what: String) {
     )
 }
 
+
+/**
+ * 「条款与协议」一节：列出四份文档，点开阅读。
+ *
+ * 自包含（自己管阅读状态），所以任何界面加一行就能有它——状态页、设置页、关于页。
+ *
+ * 它读的是**当前**的协议文本，版本号从文本解析而来，所以这一节显示的版本永远不会
+ * 与它下面那份全文的版本不一致。
+ */
+@Composable
+fun LegalSection(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val texts = remember { readAllLegalTexts(context) }
+    val documents = remember(texts) { LegalDocuments.parseAll(texts) }
+    var reading by remember { mutableStateOf<LegalDocument?>(null) }
+
+    val current = reading
+    if (current != null) {
+        LegalScreen(
+            document = current,
+            text = texts[current.id].orEmpty(),
+            onBack = { reading = null },
+            modifier = modifier,
+        )
+        return
+    }
+
+    Column(modifier = modifier) {
+        Text("条款与协议")
+
+        if (documents.isEmpty()) {
+            // 一份都读不到时说出来，而不是显示一个空的列表——空列表看起来像
+            // "这个应用没有任何条款"，那是不对的。
+            LegalUnavailable("协议文本")
+            return@Column
+        }
+
+        documents.forEach { doc ->
+            LegalRow(document = doc, onOpen = { reading = doc })
+        }
+    }
+}

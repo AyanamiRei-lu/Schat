@@ -88,6 +88,8 @@ private fun BuildStatusScreen(modifier: Modifier = Modifier) {
             accent = MaterialTheme.colorScheme.tertiary,
         )
 
+        com.schat.android.ui.legal.LegalSection()
+
         SecurityNotice()
     }
 }

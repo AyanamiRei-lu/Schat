@@ -53,21 +53,13 @@ import com.schat.android.core.onboarding.RecoveryCode
 fun OnboardingScreen(
     onGenerateIdentity: () -> Result<String>,
     /**
-     * 保存确认记录。
+     * 保存确认记录，并把已确认的版本书写下来。
      *
-     * # 为什么默认实现是"失败"，而不是一个空操作
-     *
-     * 同意发生在**保险库创建之前**（口令还没设），所以它不能走 EncryptedStore——
-     * 而 `LegalConsentStore` 目前正是那样构造的。这是一个真实的、尚未解决的冲突，
-     * 不是遗漏的接线：修法是给 `LegalConsentStore` 一个极小的键值接口，让 `:app`
-     * 提供一个明文文件实现（同意记录不是秘密：版本号与时间戳）。
-     *
-     * 在那之前，默认实现**返回失败**。空操作会让用户以为同意过了而什么都没存，
-     * 下次启动又回到这一页，而且失败得无声无息；返回失败会把原因显示出来。
+     * 同意发生在**保险库创建之前**，所以它走 [com.schat.android.data.store.PlainFileStore]
+     * 而不是 EncryptedStore：前者不需要口令派生的密钥，而后者需要——那时口令还没设。
+     * 这条记录不是秘密（版本号与时间戳），明文存储在这里是正确的选择而不是妥协。
      */
-    onTermsAccepted: () -> Result<Unit> = {
-        Result.failure(IllegalStateException("条款确认尚未接线：同意记录需要在保险库建立之前保存"))
-    },
+    onTermsAccepted: () -> Result<Unit>,
     onFinished: (OnboardingState) -> Result<Unit>,
     modifier: Modifier = Modifier,
 ) {

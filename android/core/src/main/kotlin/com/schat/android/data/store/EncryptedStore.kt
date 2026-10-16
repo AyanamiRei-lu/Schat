@@ -45,7 +45,7 @@ import javax.crypto.spec.SecretKeySpec
 class EncryptedStore(
     private val file: File,
     cipherKey: ByteArray,
-) {
+) : KeyValueStore {
     private val key: SecretKeySpec
 
     /** Base64-encoded records, keyed by their plaintext name. */
@@ -66,7 +66,7 @@ class EncryptedStore(
     }
 
     /** Returns the value for [name] as UTF-8 text, or null. */
-    fun getString(name: String): String? = get(name)?.toString(Charsets.UTF_8)
+    override fun getString(name: String): String? = get(name)?.toString(Charsets.UTF_8)
 
     /** Stores a value, replacing any previous one, and flushes to disk. */
     fun put(name: String, value: ByteArray) {
@@ -79,10 +79,10 @@ class EncryptedStore(
     }
 
     /** Stores a UTF-8 string value. */
-    fun putString(name: String, value: String) = put(name, value.toByteArray(Charsets.UTF_8))
+    override fun putString(name: String, value: String) = put(name, value.toByteArray(Charsets.UTF_8))
 
     /** Removes a record. Returns true when something was removed. */
-    fun remove(name: String): Boolean {
+    override fun remove(name: String): Boolean {
         if (records.remove(name) == null) return false
         persist()
         return true

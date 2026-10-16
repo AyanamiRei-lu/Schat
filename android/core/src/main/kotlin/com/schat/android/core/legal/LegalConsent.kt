@@ -1,6 +1,6 @@
 package com.schat.android.core.legal
 
-import com.schat.android.data.store.EncryptedStore
+import com.schat.android.data.store.KeyValueStore
 
 /**
  * 一份协议文档。
@@ -116,7 +116,7 @@ data class LegalConsent(
  *
  * 独立存储 + 一确认就落盘，让这条记录的生命周期只取决于它自己。
  */
-class LegalConsentStore(private val store: EncryptedStore) {
+class LegalConsentStore(private val store: KeyValueStore) {
 
     /** 写入一份新的确认记录，覆盖旧的。 */
     fun save(consent: LegalConsent) {
