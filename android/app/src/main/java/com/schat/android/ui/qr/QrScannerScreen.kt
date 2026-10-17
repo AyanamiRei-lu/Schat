@@ -50,6 +50,8 @@ import com.schat.android.ui.theme.Dimens
 import com.schat.android.ui.theme.OnGradient
 import com.schat.android.ui.theme.OnGradientDim
 import com.schat.android.ui.theme.SchatGradients
+import com.schat.android.ui.theme.SchatPalette
+import com.schat.android.ui.theme.SchatShapes
 import com.schat.android.ui.ui.GradientButton
 import com.schat.android.ui.ui.GradientCard
 import com.schat.android.ui.ui.ScreenHeader
@@ -177,20 +179,18 @@ fun QrScannerScreen(
                     .padding(Dimens.ScreenHorizontal),
                 verticalArrangement = Arrangement.Center,
             ) {
-                GradientCard(
-                    container = MaterialTheme.colorScheme.errorContainer,
-                    borderBrush = SchatGradients.alertBorder(),
-                ) {
+                // 用浅底 + 深字，而不是"深色模式下的 errorContainer"：这一屏的背景
+                // **始终是黑的**（相机预览铺满整屏），深色模式的深红底会在上面糊成一片。
+                GradientCard(container = SchatPalette.RedContainerLight) {
                     Text(
                         text = "相机无法启动",
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        color = SchatPalette.Red500,
                     )
                     Text(
                         text = "$cameraError\n\n你仍然可以返回并手动输入。",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        color = SchatPalette.Gray700,
                     )
                 }
             }
@@ -217,21 +217,23 @@ fun QrScannerScreen(
                             .size(VIEWFINDER_SIZE)
                             .border(
                                 width = 2.dp,
-                                brush = SchatGradients.brand(),
-                                shape = MaterialTheme.shapes.large,
+                                brush = SchatGradients.viewfinder(),
+                                shape = SchatShapes.Large,
                             )
-                            .clip(MaterialTheme.shapes.large),
+                            .clip(SchatShapes.Large),
                     )
                 }
             }
         }
 
         Column(modifier = Modifier.fillMaxSize()) {
+            // 压在相机预览上，所以这一屏的顶栏是透明的白字版本。
             ScreenHeader(
                 title = title,
                 subtitle = hint,
                 onBack = onCancel,
                 backLabel = "返回",
+                onScrim = true,
             )
             Box(modifier = Modifier.weight(1f))
             TextButton(

@@ -1,12 +1,8 @@
 package com.schat.android.ui.chat
 
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -17,18 +13,22 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,13 +38,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.schat.android.chat.ChatMessage
@@ -58,7 +55,6 @@ import com.schat.android.ui.qr.QrScannerScreen
 import com.schat.android.ui.theme.Dimens
 import com.schat.android.ui.theme.OnGradient
 import com.schat.android.ui.theme.OnGradientDim
-import com.schat.android.ui.theme.SchatGradients
 import com.schat.android.ui.theme.SchatPalette
 import com.schat.android.ui.theme.SchatShapes
 import com.schat.android.ui.ui.BarAction
@@ -180,31 +176,50 @@ fun ChatScreen(
 /**
  * The standing warning about this build's metadata protection.
  *
+ * # 它是常驻的，所以要小
+ *
+ * 这条横幅在改版前是一张大卡片：两行粗体、红色底、红色渐变描边，压在每一个会话的最上面。
+ * 它占掉屏幕顶部相当一块，抢走的注意力比它要传达的信息多得多——而它是一句**常驻**提示，
+ * 不是一次必须被处理的错误。常驻的东西越大，越会被人当成背景噪声，那正好与它存在的理由相反。
+ *
+ * 现在它是一行小字：左边一条 3dp 红条标出"这是警告"，正文用 bodySmall，
+ * 高度约为原来的三分之一。**措辞一个字没删——信息量不靠字号，也不靠感叹号和符号。**
+ *
  * Worded to say exactly what leaks and what does not. "Metadata is not protected" alone
  * would be read as "messages can be read", which is false and would push users toward a
  * worse decision than the truth does.
  */
 @Composable
 internal fun MetadataWarning() {
-    GradientCard(
-        modifier = Modifier.padding(horizontal = Dimens.Lg, vertical = Dimens.Md),
-        container = MaterialTheme.colorScheme.errorContainer,
-        borderBrush = SchatGradients.alertBorder(),
-        contentPadding = Dimens.Lg,
-    ) {
-        Text(
-            text = "⚠️ 本版本元数据保护未启用",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-        )
-        Text(
-            text = "信箱地址由你的身份公钥直接派生，因此知道你身份公钥的人可以观察到" +
-                "你何时在收发消息。消息内容仍然端到端加密，服务器与旁观者都读不到。" +
-                "这一项会在会话内令牌交换实现后被替换。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-        )
+    val dark = isDarkNow()
+    val accent = SchatPalette.Red500
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(if (dark) SchatPalette.AlertFillDark else SchatPalette.AlertFillLight)
+                .padding(horizontal = Dimens.Lg, vertical = Dimens.Sm),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.Sm),
+        ) {
+            // 一条竖线，而不是整块红底：它标出"从这里开始是警告"，但不会把整行变成红色。
+            Box(
+                modifier = Modifier
+                    .padding(top = 1.dp)
+                    .width(3.dp)
+                    .heightIn(min = 30.dp)
+                    .clip(SchatShapes.Pill)
+                    .background(accent),
+            )
+            Text(
+                text = "元数据保护未启用：信箱地址由身份公钥派生，知道你公钥的人能观察到" +
+                    "你何时收发消息。消息内容仍是端到端加密的，服务器与旁观者读不到。" +
+                    "会话内令牌交换实现后会替换掉这一机制。",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (dark) SchatPalette.ParchmentDim else SchatPalette.Gray600,
+            )
+        }
+        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
     }
 }
 
@@ -221,11 +236,10 @@ private fun Header(
     var showFullIdentity by remember { mutableStateOf(false) }
     var showQr by remember { mutableStateOf(false) }
     var showServerQr by remember { mutableStateOf(false) }
-    val dark = isDarkNow()
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        // 渐变带只放"这是哪个会话、连上了没有、能做什么"。身份、安全码、二维码都在
-        // 下面的正文里，用卡片承载——它们是要读和要核对的内容，不是导航。
+        // 顶栏只放"这是哪个会话、连上了没有、能做什么"。身份、安全码、二维码都在下面的
+        // 正文里——它们是要读和要核对的内容，不是导航。
         ScreenHeader(
             title = if (state.peerIdentityHex.isEmpty()) "SCHAT" else short(state.peerIdentityHex),
             subtitle = if (state.peerIdentityHex.isEmpty()) {
@@ -240,18 +254,23 @@ private fun Header(
             body = {
                 StatusPill(
                     text = state.connection,
-                    tone = if (state.error != null) SchatPalette.Red300 else SchatPalette.Sky400,
+                    // 一个点的颜色就是这一行的全部信息量：绿=还在正常工作，
+                    // 灰=正在做某件事（连接中、发布中），红=出错了。
+                    tone = when {
+                        state.error != null -> SchatPalette.Red500
+                        state.connection.contains("断开") ||
+                            state.connection.contains("失败") ||
+                            state.connection.contains("不可用") -> SchatPalette.Red500
+                        state.connection.contains("…") -> SchatPalette.Gray500
+                        else -> SchatPalette.GreenOK
+                    },
                 )
             },
         )
 
         ContentColumn(vertical = Dimens.Lg, gap = Dimens.Md) {
             if (state.error != null) {
-                GradientCard(
-                    container = MaterialTheme.colorScheme.errorContainer,
-                    borderBrush = SchatGradients.alertBorder(),
-                    contentPadding = Dimens.Lg,
-                ) {
+                GradientCard(container = MaterialTheme.colorScheme.errorContainer) {
                     Text(
                         text = state.error,
                         style = MaterialTheme.typography.bodySmall,
@@ -267,29 +286,35 @@ private fun Header(
                     text = if (showFullIdentity) group(myIdentity) else short(myIdentity),
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(Dimens.Sm)) {
-                    TextButton(onClick = { showFullIdentity = !showFullIdentity }) {
-                        Text(
-                            text = if (showFullIdentity) "隐藏完整身份" else "显示完整身份",
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    }
+                HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    GhostButton(
+                        text = if (showFullIdentity) "隐藏完整身份" else "显示完整身份",
+                        onClick = { showFullIdentity = !showFullIdentity },
+                    )
                     if (state.peerIdentityHex.isNotEmpty()) {
                         // Without this the restored conversation would be a one-way door: the app
                         // reopens the last peer on launch, so there has to be a way back to the picker.
-                        TextButton(onClick = onLeaveConversation) {
-                            Text(text = "换一个联系人", style = MaterialTheme.typography.labelLarge)
-                        }
+                        GhostButton(text = "换一个联系人", onClick = onLeaveConversation)
                     }
                 }
 
+                HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
+
                 // 二维码这两个动作属于"把我的身份或服务器信息交给另一台设备"，
                 // 是一次性动作，所以和身份放在同一张卡片里。
-                Row(horizontalArrangement = Arrangement.spacedBy(Dimens.Sm)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.Sm),
+                ) {
                     GhostButton(
                         text = "我的二维码",
                         onClick = { showQr = true },
@@ -306,7 +331,7 @@ private fun Header(
 
             if (state.safetyNumber.isNotEmpty()) {
                 GradientCard(contentPadding = Dimens.Lg) {
-                    SectionLabel("安全码", accent = SchatPalette.Sky400)
+                    SectionLabel("安全码")
                     Text(
                         text = "请与对方当面或通过可信渠道逐组比对：",
                         style = MaterialTheme.typography.bodySmall,
@@ -325,7 +350,6 @@ private fun Header(
             explain = "让对方扫这个码，就不必手抄 64 位十六进制了。" +
                 "注意：扫到的只是身份公钥，它不能证明对方是谁——建立会话后仍然必须比对安全码。",
             onDismiss = { showQr = false },
-            dark = dark,
         )
     }
 
@@ -340,7 +364,6 @@ private fun Header(
             explain = "让另一台设备在首次引导的「配置服务器」那一步扫这个码，它就不必手动粘贴。" +
                 "注意：这个码包含服务器地址与证书指纹，扫之前请确认对方要连的确实是同一台服务器。",
             onDismiss = { showServerQr = false },
-            dark = dark,
         )
     }
 }
@@ -365,6 +388,7 @@ private fun PeerPicker(
 ) {
     val looksValid = peer.trim().length == 64 &&
         peer.trim().lowercase().all { it in "0123456789abcdef" }
+    val dark = isDarkNow()
 
     ContentColumn(gap = Dimens.BlockGap) {
         // The contact list is local: nothing here is registered with the relay, and the
@@ -394,13 +418,30 @@ private fun PeerPicker(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            OutlinedTextField(
+            // 填充式输入框，与输入栏一致；错误态用一条红色描边表达，而不是整块变红。
+            TextField(
                 value = peer,
                 onValueChange = onPeerChange,
-                label = { Text("对端身份公钥") },
+                placeholder = { Text("对端身份公钥（64 位十六进制）") },
                 singleLine = true,
                 isError = peer.isNotEmpty() && !looksValid,
                 modifier = Modifier.fillMaxWidth(),
+                shape = SchatShapes.Medium,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = if (dark) {
+                        SchatPalette.GrayBubbleDark
+                    } else {
+                        SchatPalette.GrayBubble
+                    },
+                    unfocusedContainerColor = if (dark) {
+                        SchatPalette.GrayBubbleDark
+                    } else {
+                        SchatPalette.GrayBubble
+                    },
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    errorIndicatorColor = Color.Transparent,
+                ),
             )
 
             note?.let {
@@ -483,63 +524,41 @@ internal fun MessageList(state: ChatState, modifier: Modifier = Modifier) {
 /**
  * One message.
  *
- * 新消息有一次入场动画：淡入 + 从下方 12dp 滑到位。它在**首次组合后**才触发，
+ * 气泡是实心的：自己发的蓝底白字，收到的浅灰底深字，和 QQ 完全一致。
+ *
+ * 新消息有一次入场：淡入 + 透明度带动的一点点位移。它在**首次组合后**才触发，
  * 所以重进会话时整屏历史不会一起滑进来——那看起来像加载，不像消息到达。
- * 动画只动透明度与位移，不动尺寸，因此它不会引起整屏重排。
  */
 @Composable
 internal fun MessageBubble(message: ChatMessage) {
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
 
-    val slide by animateDpAsState(
-        targetValue = if (entered) 0.dp else Dimens.Md,
-        animationSpec = tween(240),
-        label = "schat-bubble-slide",
-    )
-    val alpha by animateFloatAsState(
+    val appear by animateFloatAsState(
         targetValue = if (entered) 1f else 0f,
-        animationSpec = tween(240),
-        label = "schat-bubble-alpha",
+        animationSpec = tween(160),
+        label = "schat-bubble-appear",
     )
     val dark = isDarkNow()
 
+    val fill = when {
+        message.outgoing && dark -> SchatPalette.Blue500
+        message.outgoing -> SchatPalette.Blue500
+        dark -> SchatPalette.GrayBubbleDark
+        else -> SchatPalette.GrayBubble
+    }
+
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = slide),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (message.outgoing) Arrangement.End else Arrangement.Start,
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .shadow(2.dp, MaterialTheme.shapes.medium, clip = false)
-                .clip(MaterialTheme.shapes.medium)
-                .background(
-                    if (message.outgoing) {
-                        if (dark) SchatGradients.outgoingDark(alpha) else SchatGradients.outgoing(alpha)
-                    } else {
-                        Brush.linearGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.surface.copy(alpha = alpha),
-                                MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = alpha),
-                            ),
-                        )
-                    },
-                )
-                .border(
-                    BorderStroke(
-                        1.dp,
-                        if (message.outgoing) {
-                            Color.Transparent
-                        } else {
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = alpha)
-                        },
-                    ),
-                    MaterialTheme.shapes.medium,
-                )
-                .padding(horizontal = Dimens.Md, vertical = Dimens.Md),
-            verticalArrangement = Arrangement.spacedBy(Dimens.Xs),
+                .fillMaxWidth(0.82f)
+                .clip(SchatShapes.Medium)
+                .background(fill.copy(alpha = appear))
+                .padding(horizontal = Dimens.Md, vertical = Dimens.Sm),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
                 text = message.text,
@@ -550,7 +569,7 @@ internal fun MessageBubble(message: ChatMessage) {
                 text = timeOf(message.atMillis) + statusSuffix(message),
                 style = MaterialTheme.typography.labelSmall,
                 color = when {
-                    message.state == DeliveryState.FAILED -> MaterialTheme.colorScheme.error
+                    message.state == DeliveryState.FAILED -> SchatPalette.Red500
                     message.outgoing -> OnGradientDim
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
@@ -564,65 +583,78 @@ internal fun MessageBubble(message: ChatMessage) {
 internal fun Composer(onSend: (String) -> Unit) {
     var draft by remember { mutableStateOf("") }
     val dark = isDarkNow()
+    val enabled = draft.isNotBlank()
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = Dimens.Md, vertical = Dimens.Md),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.Sm),
-    ) {
-        OutlinedTextField(
-            value = draft,
-            onValueChange = { draft = it },
-            label = { Text("消息") },
-            placeholder = { Text("输入内容，端到端加密后发送") },
-            modifier = Modifier.weight(1f),
-            maxLines = 4,
-        )
+    Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+        // 一条细分割线，把输入区和消息区分开。QQ 与 X 都是这样，不需要阴影。
+        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
 
-        val interaction = remember { MutableInteractionSource() }
-        // 接收者写法，而不是 collectIsPressedAsState(interaction)：后者在这个文件里
-        // 被编译器判为接收者类型不匹配（同一个调用在 ui/ui/Components.kt 里没有报错）。
-        // 两处保持同一种写法，就不会再出现这种"只在一个文件里报错"的情况。
-        val pressed by interaction.collectIsPressedAsState()
-        val lift by animateDpAsState(
-            targetValue = if (pressed) 1.dp else 5.dp,
-            animationSpec = spring(),
-            label = "schat-send-lift",
-        )
-        val enabled = draft.isNotBlank()
-
-        Box(
+        Row(
             modifier = Modifier
-                .size(54.dp)
-                .shadow(lift, SchatShapes.Pill, clip = false)
-                .clip(SchatShapes.Pill)
-                .background(
-                    when {
-                        !enabled && dark -> SchatGradients.disabledDark()
-                        !enabled -> SchatGradients.disabled()
-                        dark -> SchatGradients.brandDark()
-                        else -> SchatGradients.brand()
-                    },
-                )
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    enabled = enabled,
-                ) {
-                    onSend(draft)
-                    draft = ""
-                },
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .padding(horizontal = Dimens.Md, vertical = Dimens.Sm),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(Dimens.Sm),
         ) {
-            Text(
-                text = "↑",
-                style = MaterialTheme.typography.titleLarge,
-                color = OnGradient,
-                fontWeight = FontWeight.Bold,
+            // 填充式输入框（浅灰底、无边框），而不是描边框。QQ 与 X 的输入框都是填充式。
+            TextField(
+                value = draft,
+                onValueChange = { draft = it },
+                placeholder = { Text("输入消息") },
+                modifier = Modifier.weight(1f),
+                maxLines = 4,
+                shape = SchatShapes.Medium,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = if (dark) {
+                        SchatPalette.GrayBubbleDark
+                    } else {
+                        SchatPalette.GrayBubble
+                    },
+                    unfocusedContainerColor = if (dark) {
+                        SchatPalette.GrayBubbleDark
+                    } else {
+                        SchatPalette.GrayBubble
+                    },
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                ),
             )
+
+            val interaction = remember { MutableInteractionSource() }
+            // 接收者写法，而不是 collectIsPressedAsState(interaction)：后者在这个文件里
+            // 被编译器判为接收者类型不匹配（同一个调用在 ui/ui/Components.kt 里没有报错）。
+            // 两处保持同一种写法，就不会再出现这种"只在一个文件里报错"的情况。
+            val pressed by interaction.collectIsPressedAsState()
+            val fill = when {
+                !enabled && dark -> SchatPalette.BlackFill
+                !enabled -> SchatPalette.GrayBubble
+                pressed -> SchatPalette.Blue600
+                dark -> SchatPalette.Blue400
+                else -> SchatPalette.Blue500
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(fill)
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        enabled = enabled,
+                    ) {
+                        onSend(draft)
+                        draft = ""
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "↑",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (enabled) OnGradient else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -648,7 +680,6 @@ private fun SchatQrDialog(
     payload: String,
     explain: String,
     onDismiss: () -> Unit,
-    dark: Boolean = isDarkNow(),
 ) {
     if (payload.isEmpty()) return
 
@@ -657,19 +688,8 @@ private fun SchatQrDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = MaterialTheme.shapes.large,
+            shape = SchatShapes.Large,
             color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.border(
-                BorderStroke(
-                    1.dp,
-                    if (dark) {
-                        SchatGradients.cardBorderDark(MaterialTheme.colorScheme.outlineVariant)
-                    } else {
-                        SchatGradients.cardBorder(MaterialTheme.colorScheme.outlineVariant)
-                    },
-                ),
-                MaterialTheme.shapes.large,
-            ),
         ) {
             Column(
                 modifier = Modifier

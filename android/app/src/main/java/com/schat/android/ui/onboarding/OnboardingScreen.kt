@@ -1,10 +1,15 @@
 package com.schat.android.ui.onboarding
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -16,8 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -28,13 +32,11 @@ import com.schat.android.core.qr.QrPayload
 import com.schat.android.ui.qr.QrScannerScreen
 import com.schat.android.core.onboarding.RecoveryCode
 import com.schat.android.ui.theme.Dimens
-import com.schat.android.ui.theme.SchatGradients
-import com.schat.android.ui.theme.SchatPalette
+import com.schat.android.ui.theme.SchatShapes
 import com.schat.android.ui.ui.ContentColumn
 import com.schat.android.ui.ui.GhostButton
 import com.schat.android.ui.ui.GradientButton
 import com.schat.android.ui.ui.GradientCard
-import com.schat.android.ui.ui.GradientLogoMark
 import com.schat.android.ui.ui.MonoBlock
 import com.schat.android.ui.ui.ProgressBar
 import com.schat.android.ui.ui.ScreenBackground
@@ -98,10 +100,7 @@ fun OnboardingScreen(
 
             ContentColumn(gap = Dimens.BlockGap) {
                 error?.let { message ->
-                    GradientCard(
-                        container = MaterialTheme.colorScheme.errorContainer,
-                        borderBrush = SchatGradients.alertBorder(),
-                    ) {
+                    GradientCard(container = MaterialTheme.colorScheme.errorContainer) {
                         Text(
                             text = message,
                             style = MaterialTheme.typography.bodySmall,
@@ -203,7 +202,7 @@ private fun IdentityStep(
     onGenerate: () -> Unit,
     onNext: () -> Unit,
 ) {
-    SectionLabel("第一步 · 生成身份", accent = SchatPalette.Blue500)
+    SectionLabel("第一步 · 生成身份")
 
     Text(
         text = "SCHAT 没有账号也没有密码。你的身份是这台设备上生成的一对密钥，" +
@@ -217,25 +216,13 @@ private fun IdentityStep(
     }
 
     GradientCard {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.Md),
-        ) {
-            GradientLogoMark(letter = "ID", size = 38.dp)
-            Column {
-                Text(
-                    text = "身份指纹",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = "与对方当面核对时，比对的应当是安全码，不是这个指纹。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        SectionLabel("身份指纹")
         MonoBlock(text = identityLabel)
+        Text(
+            text = "与对方当面核对时，比对的应当是安全码，不是这个指纹。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 
     GradientButton(text = "下一步", onClick = onNext)
@@ -246,30 +233,18 @@ private fun PassphraseStep(onSubmit: (String, String) -> Unit) {
     var passphrase by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
 
-    SectionLabel("第二步 · 设置口令", accent = SchatPalette.Blue500)
+    SectionLabel("第二步 · 设置口令")
 
     Text(
         text = "口令用于加密本机数据库，并与设备的安全芯片共同保护你的密钥。",
         style = MaterialTheme.typography.bodyMedium,
     )
 
-    GradientCard(
-        container = MaterialTheme.colorScheme.errorContainer,
-        borderBrush = SchatGradients.alertBorder(),
-    ) {
-        Text(
-            text = "⚠️ 没有「找回口令」这回事",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-        )
-        Text(
-            text = "服务器不保存任何数据，忘记口令就意味着数据永久丢失——" +
-                "请务必同时抄下下一步的恢复码。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-        )
-    }
+    WarningLine(
+        title = "没有「找回口令」这回事",
+        body = "服务器不保存任何数据，忘记口令就意味着数据永久丢失——" +
+            "请务必同时抄下下一步的恢复码。",
+    )
 
     OutlinedTextField(
         value = passphrase,
@@ -302,7 +277,7 @@ private fun RecoveryStep(state: OnboardingState, onSubmit: (List<String>) -> Uni
     val indices = state.confirmationIndices()
     val inputs = remember(state.step) { mutableStateOf(List(indices.size) { "" }) }
 
-    SectionLabel("第三步 · 抄写恢复码", accent = SchatPalette.Blue500)
+    SectionLabel("第三步 · 抄写恢复码")
 
     Text(
         text = "请把下面 24 个单词抄在纸上并妥善保管。" +
@@ -311,15 +286,7 @@ private fun RecoveryStep(state: OnboardingState, onSubmit: (List<String>) -> Uni
         style = MaterialTheme.typography.bodyMedium,
     )
 
-    GradientCard(container = MaterialTheme.colorScheme.surfaceContainerLow) {
-        SectionLabel("恢复码 · 24 个单词")
-        Text(
-            text = RecoveryCode.format(state.recoveryWords),
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Medium,
-        )
-    }
+    MonoBlock(text = RecoveryCode.format(state.recoveryWords))
 
     SectionLabel("确认：请填写下面几个位置的单词")
 
@@ -371,7 +338,7 @@ private fun ServerStep(onSubmit: (String) -> Unit) {
         return
     }
 
-    SectionLabel("最后一步 · 配置服务器", accent = SchatPalette.Blue500)
+    SectionLabel("最后一步 · 配置服务器")
 
     Text(
         text = "把服务器的连接信息粘贴进来，或扫描另一台已配置好的设备上显示的「服务器连接码」。",
@@ -418,5 +385,43 @@ private fun ServerStep(onSubmit: (String) -> Unit) {
             onClick = { scanning = true },
             modifier = Modifier.weight(1f),
         )
+    }
+}
+
+/**
+ * 一条警告：左边一条红竖线 + 一个小标题 + 一段说明。
+ *
+ * # 为什么不是"红色卡片"
+ *
+ * 上一版这里是一个红底红字的卡片，外面再套一圈红色描边。红色块面积一大，界面上就出现了
+ * 第二个视觉重心，而这一页的主角是口令输入框。竖线加红字同样说清了"这是警告"，
+ * 但它不抢重心——这也是 QQ 与 X 表达警告的方式。
+ */
+@Composable
+private fun WarningLine(title: String, body: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Dimens.Sm),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(top = 2.dp)
+                .width(3.dp)
+                .heightIn(min = 34.dp)
+                .clip(SchatShapes.Pill)
+                .background(MaterialTheme.colorScheme.error),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.Xs)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

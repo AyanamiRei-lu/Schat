@@ -60,14 +60,18 @@
 | 服务端：零第三方依赖 | `GOWORK=off go list -m all` | 只有自身模块 |
 | 服务端：不导入协议核心 | `GOWORK=off go list -deps ./...` | 依赖树里没有 `protocol` |
 | 客户端核心（纯 JVM） | `cd android && ./gradlew :core:test` | **194 项通过，4 项 SKIP** |
-| 客户端编译 | `./gradlew :app:assembleDebug` | 产出 **37.4 MB** debug APK |
+| 客户端编译 | `./gradlew :app:assembleDebug` | 干净构建产出 **27.07 MB** debug APK |
 | CI | GitHub Actions | 三个 job；Go 两个为绿 |
 
-> **界面层（2026 年的一次 UI 改版）**：配色收敛到白/蓝/黑三族、加了渐变与动画、
-> 所有界面改为共用 `ui/ui/Components.kt` 的零件。验证方式是
-> `./gradlew :app:assembleDebug` 与 `:app:compileDebugKotlin --rerun-tasks`（全量重编）
-> 均通过、APK 仍为 37.4 MB。**它没有被任何自动化测试覆盖，也没有在真机上跑过**——
-> 界面在这个项目里一直是"只能靠真机验证"的那一类（见第 3.2 节）。
+> **界面层（两轮 UI 改版）**：第一轮把配色收敛到白/蓝/黑三族、抽出 `ui/ui/Components.kt`，
+> 但把渐变铺满了页面底、顶栏、按钮、气泡和卡片——那种"每一处都在喊"的效果被指出为"AI 味"。
+> 第二轮按 **QQ 与 X** 的做法推平：渐变只剩相机取景框的描边一处，取消阴影与发光，
+> 层级改由灰度与 1dp 分割线承担，动效只留按压反馈与 150ms 换屏过渡，文案里的 emoji 去掉。
+> 元数据警告横幅从一张大卡片缩成一条 3dp 红竖线 + 一行小字（措辞未删）。
+>
+> 验证方式是 `:app:compileDebugKotlin --rerun-tasks`（全量重编）与 `:app:assembleDebug` 均通过。
+> **它没有被任何自动化测试覆盖，也没有在真机上跑过**——界面在这个项目里一直是
+> "只能靠真机验证"的那一类（见第 3.2 节）。
 
 ### 2.1 群聊的四个"跟随"场景（这是 M4 的核心）
 
@@ -103,7 +107,7 @@ MLS 里最容易出错、也最难发现的，是"某个成员在群变化之后
 | **群聊的双机真机验证** | 协议层有端到端测试，客户端编译通过，**但两台手机互相加人从未实际跑过** | **最高**——这是客户端唯一一块"逻辑测过、界面没过"的地方 |
 | **相机扫码** | `ui/qr/QrScannerScreen.kt` 存在且编译通过 | `AppInfo.kt` **自己承认**："相机扫码路径**未在真机上验证过**：构建环境没有摄像头，只能保证编译通过" |
 | **MLS `UpdatePath` / `Welcome` 的互操作性** | 有自洽性测试与端到端测试，**但没有官方逐字节向量** | 与**其它 MLS 实现**互通未经第三方验证。`SECURITY.md` 里写明了 |
-| **release 构建的体积** | 只测过 debug（37.4 MB） | R8 开启后的体积未知；`README.md` 明说"在测出来之前不声称 release 体积" |
+| **release 构建的体积** | 只测过 debug（27.07 MB） | R8 开启后的体积未知；`README.md` 明说"在测出来之前不声称 release 体积" |
 
 > **写这一节的理由**：这个项目里最容易犯的错误，是把"编译通过"当成"能用"，把"自洽性测试通过"当成"互操作正确"。上面每一条都标了它到底证明了什么。
 
@@ -306,22 +310,32 @@ go build ./... && go test ./...
 | `ui/qr/QrScannerScreen.kt` | 相机扫码（**未在真机验证**） |
 | `ui/theme/Theme.kt` | 主题：白/蓝/黑三族的 Material3 配色、字阶、形状 |
 | `ui/theme/DesignTokens.kt` | 颜色、间距、圆角三个令牌对象；**界面里的裸 `.dp` 和 `Color(0x…)` 应当只有这一处** |
-| `ui/theme/Gradients.kt` | 全部渐变（页面底、顶栏、按钮、气泡、卡片描边）与"呼吸"动画值 |
+| `ui/theme/Gradients.kt` | 全应用**唯一**的渐变：相机取景框的描边（理由见下） |
 | `ui/ui/Components.kt` | 界面零件：`ScreenBackground`／`ScreenHeader`／`GradientCard`／`GradientButton`／`GhostButton`／`BarAction`／`StatusPill`／`UnreadPill`／`GradientAvatar`／`ProgressBar`／`CheckOption`／`MonoBlock`／`FadeSwap` |
 
 **关于界面层本身**（这一段是给下一位改界面的人的）：
 
-- **所有颜色只来自 `DesignTokens.kt`**，且只用白、蓝、黑三族；红色是语义色（错误、失败、
-  元数据警告），不作为装饰。没有主题引擎，也没有动态取色——能重新给界面上色的通道，
-  同时也是能用来伪装界面的通道。
-- **动画只动颜色、位移与绘制坐标**，不动布局尺寸（唯二的例外是 `ProgressBar` 的填充宽度
-  和 `GradientButton` 的按钮高度）。布局尺寸的动画会带来整屏重排，那看起来是卡，不是流畅。
-  时长：转场 200ms、气泡入场 240ms、按压反馈 140–180ms、背景呼吸 12–14 秒。
+- **视觉基准是 QQ 与 X，不是"设计感"。** 它们能十年不过时的原因是克制：页面纯白/纯黑、
+  层级靠灰度与 1dp 分割线、蓝色只出现在"能点的东西"和"自己发出的消息"上。改界面之前
+  先问一句"QQ 或 X 会这么做吗"，能挡掉绝大多数装饰性改动。
+- **渐变、阴影、发光、渐变文字一律不要用**（`SchatGradients` 里只剩取景框描边：它压在
+  明度未知的相机预览上，纯色描边会在浅色画面里消失）。上一版把渐变铺在页面底、顶栏、
+  按钮、气泡、卡片描边和品牌字样上，就是通常说的"AI 味"——每一处都在喊，
+  结果没有一处值得看。
+- **颜色只来自 `DesignTokens.kt`**，白/蓝/黑三族；红与绿是语义色（错误、未读、已连接），
+  不作为装饰。没有主题引擎，也没有动态取色——能重新给界面上色的通道，同时也是能用来
+  伪装界面的通道。
+- **动效只保留两类**：按压反馈（改颜色）与换屏过渡（150ms 交叉淡入）。没有飘浮、呼吸、
+  发光、位移入场。**动画只动颜色与透明度，不动布局尺寸**（唯一的例外是 `ProgressBar`
+  的填充宽度）——尺寸动画会带来整屏重排，那看起来是卡，不是流畅。
 - **换屏动画的键必须是"真的换了一屏"**：`SchatRoot` 用 `Stage`，`ChatScreen` 用对端身份。
   用连接状态当键会让界面随每一次状态更新闪烁。
+- **文案里不用 emoji**：表情符号会把一行严肃提示变成一句口号，而警告的分量应当由颜色与
+  位置承担（例：元数据警告现在是一条 3dp 红竖线 + 一行 bodySmall 小字）。
 - **改过界面代码后必须 `--rerun-tasks`**（见第 10.3 节），并且 `MaterialTheme.shapes` 的类型
   是 Material3 自己的 `Shapes`——往它上面加属性是不行的，需要胶囊形时显式用
-  `SchatShapes.Pill`。
+  `SchatShapes.Pill`。同理，`GradientCard` 的 `borderBrush`／`elevation` 是**保留参数、
+  没有视觉效果**，新代码不要再传（这些名字里的 `Gradient` 已经是历史遗留）。
 
 ### 7.3 构建与测试
 
@@ -371,7 +385,13 @@ cd android
 **已知的构建事实**（实测）：
 
 - AAR 体积 **10.18 MB**，构建耗时 **270–300 秒**（有缓存）/ 约 **900 秒**（首次）
-- debug APK **37.4 MB**（含三个 ABI 的原生库）
+- debug APK **27.07 MB**（干净构建实测：`gradlew clean :app:assembleDebug`，28,381,221 字节）
+  ⚠️ **不要用增量构建的体积来记录这个数字**：今天先读到 37.4 MB，`--rerun-tasks` 之后
+    读到 27.1 MB，最后用干净构建确认 27.07 MB——同一个包，差 10 MB，原因是增量 dex
+    会留下陈旧分片。上一次有记录的干净构建是 **24.61 MB**（`SCHAT.md` v0.10、
+    `docs/DEVICE-TEST.md` 记 24.67 MB），差的那约 2.5 MB 是扫码与界面层的增量。
+    `README.md` 里原先同时写着"37.4 MB"与"干净构建约 24.6 MB"两个互相矛盾的数字，
+    现已按实测统一（同类问题见第 10.3 节）。
 - **`lib/x86/libgojni.so` 缺失**——只有 **32 位 x86 模拟器**会崩，arm / arm64 / x86_64 都正常
 
 ---
@@ -592,7 +612,7 @@ powershell -ExecutionPolicy Bypass -File tools/verify.ps1
 | protocol **305 通过 / 49 子测试 / 1 SKIP** | `cd protocol && go test ./... -count=1 -v` 后数 `--- PASS` 行 |
 | server **116 通过 / 32 子测试** | `cd server && go test ./... -count=1 -v` |
 | `:core` **194 通过 / 4 SKIP** | `cd android && ./gradlew :core:test`；或数 `android/core/build/test-results/test/*.xml` |
-| APK **37.4 MB** | `./gradlew :app:assembleDebug` 后看 `android/app/build/outputs/apk/debug/` |
+| APK **27.07 MB** | `./gradlew clean :app:assembleDebug` 后看 `android/app/build/outputs/apk/debug/`；**不要用增量构建的结果** |
 | AAR **10.18 MB** | `tools/build-protocol.ps1` 的输出 |
 | 部署内存 **2.7 MB** | 服务器上 `systemctl status schat-server` |
 

@@ -121,7 +121,7 @@ fun LegalScreen(
     if (embedded) {
         body()
     } else {
-        ScreenBackground(aurora = false) { body() }
+        ScreenBackground { body() }
     }
 }
 

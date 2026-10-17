@@ -38,7 +38,6 @@ import com.schat.android.data.store.EncryptedStore
 import com.schat.android.ui.chat.ChatScreen
 import com.schat.android.ui.onboarding.OnboardingScreen
 import com.schat.android.ui.theme.Dimens
-import com.schat.android.ui.theme.SchatGradients
 import com.schat.android.ui.ui.ContentColumn
 import com.schat.android.ui.ui.FadeSwap
 import com.schat.android.ui.ui.GradientButton
@@ -544,10 +543,7 @@ private fun UnlockScreen(error: String?, onSubmit: (String) -> Unit) {
 
             ContentColumn(gap = Dimens.BlockGap) {
                 error?.let { message ->
-                    GradientCard(
-                        container = MaterialTheme.colorScheme.errorContainer,
-                        borderBrush = SchatGradients.alertBorder(),
-                    ) {
+                    GradientCard(container = MaterialTheme.colorScheme.errorContainer) {
                         Text(
                             text = message,
                             style = MaterialTheme.typography.bodySmall,

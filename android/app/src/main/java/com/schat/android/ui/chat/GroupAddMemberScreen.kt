@@ -21,7 +21,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.schat.android.ui.theme.Dimens
 import com.schat.android.ui.theme.OnGradient
-import com.schat.android.ui.theme.SchatGradients
 import com.schat.android.ui.theme.SchatPalette
 import com.schat.android.ui.ui.ContentColumn
 import com.schat.android.ui.ui.GradientCard
@@ -106,7 +105,7 @@ fun GroupAddMemberScreen(
                                 modifier = Modifier
                                     .size(34.dp)
                                     .clip(RoundedCornerShape(percent = 32))
-                                    .background(SchatGradients.brand()),
+                                    .background(MaterialTheme.colorScheme.primary),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(

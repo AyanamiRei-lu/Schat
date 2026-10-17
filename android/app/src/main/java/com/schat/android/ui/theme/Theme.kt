@@ -19,44 +19,45 @@ import androidx.compose.ui.unit.sp
 // the user cannot audit.
 
 private val LightColors = lightColorScheme(
-    // Blue is the accent, white is the canvas.
+    // Blue is an accent, not a decoration: it appears only on things you can press and on
+    // the messages you sent. Everything else is white, grey or black.
     primary = SchatPalette.Blue500,
     onPrimary = SchatPalette.White,
     primaryContainer = SchatPalette.Blue50,
     onPrimaryContainer = SchatPalette.Blue700,
-    inversePrimary = SchatPalette.Blue400,
 
-    secondary = SchatPalette.Blue700,
+    secondary = SchatPalette.Gray700,
     onSecondary = SchatPalette.White,
-    secondaryContainer = SchatPalette.Blue100,
-    onSecondaryContainer = SchatPalette.Blue700,
+    secondaryContainer = SchatPalette.GrayFill,
+    onSecondaryContainer = SchatPalette.Ink,
 
-    tertiary = SchatPalette.Sky400,
-    onTertiary = SchatPalette.Ink,
-    tertiaryContainer = SchatPalette.Blue50,
-    onTertiaryContainer = SchatPalette.Blue700,
+    tertiary = SchatPalette.Gray600,
+    onTertiary = SchatPalette.White,
+    tertiaryContainer = SchatPalette.GrayFill,
+    onTertiaryContainer = SchatPalette.Ink,
 
     background = SchatPalette.White,
     onBackground = SchatPalette.Ink,
 
     surface = SchatPalette.White,
     onSurface = SchatPalette.Ink,
-    // Outgoing bubbles and unread badges sit on this.
-    surfaceVariant = SchatPalette.Blue50,
+    // Fill blocks: incoming bubbles, the composer field, pressed list rows.
+    surfaceVariant = SchatPalette.GrayBubble,
     onSurfaceVariant = SchatPalette.Gray600,
-    surfaceTint = SchatPalette.Blue500,
+    surfaceTint = Color.Transparent,
     surfaceBright = SchatPalette.White,
-    surfaceDim = SchatPalette.Gray100,
+    surfaceDim = SchatPalette.GrayFill,
     surfaceContainerLowest = SchatPalette.White,
-    surfaceContainerLow = SchatPalette.SurfaceMuted,
-    surfaceContainer = SchatPalette.SurfaceMuted,
-    surfaceContainerHigh = SchatPalette.Gray100,
-    surfaceContainerHighest = SchatPalette.Gray200,
+    surfaceContainerLow = SchatPalette.GrayFill,
+    surfaceContainer = SchatPalette.GrayFill,
+    surfaceContainerHigh = SchatPalette.GrayBubble,
+    surfaceContainerHighest = SchatPalette.GrayBubble,
     inverseSurface = SchatPalette.Ink,
     inverseOnSurface = SchatPalette.Parchment,
 
-    outline = SchatPalette.Gray200,
-    outlineVariant = SchatPalette.LineLight,
+    // One hairline grey, used for every divider and outline in the app.
+    outline = SchatPalette.Line,
+    outlineVariant = SchatPalette.Line,
 
     error = SchatPalette.Red500,
     onError = SchatPalette.White,
@@ -67,48 +68,46 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    // Black is the canvas, blue is the accent.
     primary = SchatPalette.Blue400,
-    onPrimary = SchatPalette.Ink,
+    onPrimary = SchatPalette.Black,
     primaryContainer = SchatPalette.BlueNight,
     onPrimaryContainer = SchatPalette.Blue100,
-    inversePrimary = SchatPalette.Blue700,
 
-    secondary = SchatPalette.Blue400,
-    onSecondary = SchatPalette.Ink,
-    secondaryContainer = SchatPalette.BlueNightDeep,
-    onSecondaryContainer = SchatPalette.Blue100,
+    secondary = SchatPalette.ParchmentDim,
+    onSecondary = SchatPalette.Black,
+    secondaryContainer = SchatPalette.BlackFill,
+    onSecondaryContainer = SchatPalette.Parchment,
 
-    tertiary = SchatPalette.Sky400,
-    onTertiary = SchatPalette.Ink,
-    tertiaryContainer = SchatPalette.BlueNightDeep,
-    onTertiaryContainer = SchatPalette.Blue100,
+    tertiary = SchatPalette.ParchmentDim,
+    onTertiary = SchatPalette.Black,
+    tertiaryContainer = SchatPalette.BlackFill,
+    onTertiaryContainer = SchatPalette.Parchment,
 
     background = SchatPalette.Black,
     onBackground = SchatPalette.Parchment,
 
-    surface = SchatPalette.BlackSoft,
+    surface = SchatPalette.Black,
     onSurface = SchatPalette.Parchment,
-    surfaceVariant = SchatPalette.BlackSurface,
+    surfaceVariant = SchatPalette.GrayBubbleDark,
     onSurfaceVariant = SchatPalette.ParchmentDim,
-    surfaceTint = SchatPalette.Blue400,
-    surfaceBright = SchatPalette.BlackSurface,
+    surfaceTint = Color.Transparent,
+    surfaceBright = SchatPalette.BlackFill,
     surfaceDim = SchatPalette.Black,
     surfaceContainerLowest = SchatPalette.Black,
-    surfaceContainerLow = SchatPalette.BlackSoft,
-    surfaceContainer = SchatPalette.BlackSoft,
-    surfaceContainerHigh = SchatPalette.BlackSurface,
-    surfaceContainerHighest = SchatPalette.LineDark,
+    surfaceContainerLow = SchatPalette.BlackFill,
+    surfaceContainer = SchatPalette.BlackFill,
+    surfaceContainerHigh = SchatPalette.GrayBubbleDark,
+    surfaceContainerHighest = SchatPalette.GrayBubbleDark,
     inverseSurface = SchatPalette.Parchment,
     inverseOnSurface = SchatPalette.Ink,
 
     outline = SchatPalette.LineDark,
     outlineVariant = SchatPalette.LineDark,
 
-    error = SchatPalette.Red300,
-    onError = SchatPalette.Black,
+    error = SchatPalette.Red500,
+    onError = SchatPalette.White,
     errorContainer = SchatPalette.RedContainerDark,
-    onErrorContainer = SchatPalette.Red300,
+    onErrorContainer = SchatPalette.Red500,
 
     scrim = SchatPalette.Black,
 )
@@ -116,115 +115,45 @@ private val DarkColors = darkColorScheme(
 /**
  * Typography.
  *
- * # Why there is no custom font
+ * # Why this is deliberately plain
  *
- * A bundled typeface would be one more binary in a security-sensitive APK, and the
- * project's own rule is that anything shipped can be checked. The system font is
- * something the user's platform already vouches for, so only the *scale* is adjusted
- * here: heavier headings, tighter headline tracking, roomier body text.
+ * An earlier revision used tight negative tracking, heavier weights and a large display
+ * scale — the "every heading is a poster" look. QQ and X both set their headings only a
+ * little larger than body text and let weight and colour do the work, which is what this
+ * scale does: headings stay near body size, body text gets enough line height to read.
  *
- * Monospace is not decoration — identity keys, safety numbers and the recovery phrase
- * are compared character by character, and a proportional font makes that genuinely
- * harder to do correctly.
+ * There is no bundled typeface. A font would be one more binary in a security-sensitive
+ * APK, and the project's own rule is that anything shipped can be checked; the system
+ * font is something the platform already vouches for.
+ *
+ * Monospace is not decoration — identity keys, safety numbers and the recovery phrase are
+ * compared character by character, and a proportional font makes that harder to do right.
  */
 private val SchatTypography = Typography(
-    displayLarge = TextStyle(
-        fontSize = 50.sp,
-        lineHeight = 58.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = (-1.4).sp,
-    ),
-    displayMedium = TextStyle(
-        fontSize = 40.sp,
-        lineHeight = 48.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = (-0.8).sp,
-    ),
-    displaySmall = TextStyle(
-        fontSize = 32.sp,
-        lineHeight = 40.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = (-0.5).sp,
-    ),
-    headlineLarge = TextStyle(
-        fontSize = 30.sp,
-        lineHeight = 38.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = (-0.6).sp,
-    ),
-    headlineMedium = TextStyle(
-        fontSize = 25.sp,
-        lineHeight = 32.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = (-0.3).sp,
-    ),
-    headlineSmall = TextStyle(
-        fontSize = 21.sp,
-        lineHeight = 28.sp,
-        fontWeight = FontWeight.SemiBold,
-    ),
-    titleLarge = TextStyle(
-        fontSize = 19.sp,
-        lineHeight = 26.sp,
-        fontWeight = FontWeight.SemiBold,
-    ),
-    titleMedium = TextStyle(
-        fontSize = 16.sp,
-        lineHeight = 23.sp,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = 0.1.sp,
-    ),
-    titleSmall = TextStyle(
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = 0.1.sp,
-    ),
-    bodyLarge = TextStyle(
-        fontSize = 16.sp,
-        lineHeight = 25.sp,
-        fontWeight = FontWeight.Normal,
-        letterSpacing = 0.15.sp,
-    ),
-    bodyMedium = TextStyle(
-        fontSize = 14.sp,
-        lineHeight = 22.sp,
-        fontWeight = FontWeight.Normal,
-        letterSpacing = 0.15.sp,
-    ),
-    bodySmall = TextStyle(
-        fontSize = 12.5.sp,
-        lineHeight = 19.sp,
-        fontWeight = FontWeight.Normal,
-        letterSpacing = 0.2.sp,
-    ),
-    labelLarge = TextStyle(
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = 0.3.sp,
-    ),
-    labelMedium = TextStyle(
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        fontWeight = FontWeight.Medium,
-        letterSpacing = 0.5.sp,
-    ),
-    labelSmall = TextStyle(
-        fontSize = 11.sp,
-        lineHeight = 15.sp,
-        fontWeight = FontWeight.Medium,
-        letterSpacing = 0.5.sp,
-    ),
+    displayLarge = TextStyle(fontSize = 34.sp, lineHeight = 42.sp, fontWeight = FontWeight.SemiBold),
+    displayMedium = TextStyle(fontSize = 30.sp, lineHeight = 38.sp, fontWeight = FontWeight.SemiBold),
+    displaySmall = TextStyle(fontSize = 26.sp, lineHeight = 34.sp, fontWeight = FontWeight.SemiBold),
+    headlineLarge = TextStyle(fontSize = 23.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold),
+    headlineMedium = TextStyle(fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
+    headlineSmall = TextStyle(fontSize = 18.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold),
+    titleLarge = TextStyle(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
+    titleMedium = TextStyle(fontSize = 15.5.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium),
+    titleSmall = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium),
+    bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Normal),
+    bodyMedium = TextStyle(fontSize = 14.5.sp, lineHeight = 22.sp, fontWeight = FontWeight.Normal),
+    bodySmall = TextStyle(fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.Normal),
+    labelLarge = TextStyle(fontSize = 14.5.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium),
+    labelMedium = TextStyle(fontSize = 12.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
+    labelSmall = TextStyle(fontSize = 11.5.sp, lineHeight = 15.sp, fontWeight = FontWeight.Normal),
 )
 
 /** The monospace face used for keys, fingerprints and the recovery phrase. */
 val MonospaceStyle: FontFamily = FontFamily.Monospace
 
-/** A translucent white, used for text drawn on top of a gradient. */
+/** Text drawn on top of solid blue (buttons, outgoing bubbles). */
 val OnGradient: Color = Color.White
 
-/** A dimmed white, used for secondary text drawn on top of a gradient. */
+/** Secondary text drawn on top of solid blue. */
 val OnGradientDim: Color = Color(0xD9FFFFFF)
 
 /**

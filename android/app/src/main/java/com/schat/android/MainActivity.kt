@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -71,13 +72,13 @@ private fun BuildStatusScreen(modifier: Modifier = Modifier) {
                 title = AppInfo.NAME,
                 subtitle = stringResource(R.string.status_subtitle),
                 body = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Dimens.Md),
-                    ) {
-                        StatusPill(text = "v${AppInfo.VERSION}")
-                        StatusPill(text = "minSdk ${AppInfo.MIN_ANDROID}")
-                    }
+                    // 一行灰字，而不是两个胶囊标签：版本号和 minSdk 是纯信息，
+                    // 把它们做成"徽标"只是在制造装饰。
+                    Text(
+                        text = "v${AppInfo.VERSION} · minSdk ${AppInfo.MIN_ANDROID}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 },
             )
 
@@ -87,11 +88,11 @@ private fun BuildStatusScreen(modifier: Modifier = Modifier) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Dimens.Md),
                     ) {
-                        GradientLogoMark(letter = "S", size = 44.dp)
+                        GradientLogoMark(letter = "S", size = 40.dp)
                         Column {
                             GradientWordmark(
                                 text = AppInfo.NAME,
-                                style = MaterialTheme.typography.headlineSmall,
+                                style = MaterialTheme.typography.titleLarge,
                             )
                             Text(
                                 text = "端到端加密聊天 · 服务器只转发密文",
@@ -100,6 +101,8 @@ private fun BuildStatusScreen(modifier: Modifier = Modifier) {
                             )
                         }
                     }
+
+                    HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
 
                     KeyValueRow(label = "单聊协议", value = AppInfo.PROTOCOL)
                     KeyValueRow(label = "群聊协议", value = AppInfo.GROUP_PROTOCOL)
@@ -136,17 +139,18 @@ private fun StatusCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.Sm),
         ) {
+            SectionLabel(title)
             Box(
                 modifier = Modifier
-                    .size(10.dp)
+                    .size(6.dp)
                     .clip(CircleShape)
                     .background(accent),
             )
-            SectionLabel(title, accent = accent)
         }
 
         entries.forEach { entry ->
             Text(
+                // 条目之间的分隔改用行距与标记，而不是每行重复一个符号。
                 text = "· $entry",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,

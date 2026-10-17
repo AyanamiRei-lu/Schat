@@ -2,22 +2,19 @@ package com.schat.android.ui.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.schat.android.chat.ChatMessage
@@ -25,7 +22,6 @@ import com.schat.android.chat.ChatState
 import com.schat.android.chat.DeliveryState
 import com.schat.android.core.groups.GroupMessage
 import com.schat.android.ui.theme.Dimens
-import com.schat.android.ui.theme.SchatPalette
 import com.schat.android.ui.theme.SchatShapes
 import com.schat.android.ui.ui.BarAction
 import com.schat.android.ui.ui.ScreenBackground
@@ -80,7 +76,7 @@ fun GroupScreen(
     members: List<String>,
     modifier: Modifier = Modifier,
 ) {
-    ScreenBackground(aurora = false) {
+    ScreenBackground {
         Column(modifier = modifier.fillMaxSize()) {
             // 常驻，不可关闭。
             MetadataWarning()
@@ -122,47 +118,41 @@ fun GroupScreen(
 private fun MemberStrip(members: List<String>) {
     if (members.isEmpty()) return
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.72f))
-            .padding(horizontal = Dimens.Md, vertical = Dimens.Sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.Sm),
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = Dimens.Lg, vertical = Dimens.Sm),
+        verticalArrangement = Arrangement.spacedBy(Dimens.Xs),
     ) {
-        SectionLabel("成员")
-        members.take(MEMBER_CHIP_LIMIT).forEach { name ->
-            Row(
-                modifier = Modifier
-                    .clip(SchatShapes.Pill)
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                    .padding(horizontal = Dimens.Md, vertical = Dimens.Xs),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Dimens.Sm),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(SchatPalette.Blue500),
-                )
+        SectionLabel("成员 ${members.size}")
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimens.Sm),
+        ) {
+            members.take(MEMBER_CHIP_LIMIT).forEach { name ->
                 Text(
                     text = name,
                     style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 96.dp),
+                    modifier = Modifier
+                        .clip(SchatShapes.Pill)
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .padding(horizontal = Dimens.Sm, vertical = 2.dp)
+                        .widthIn(max = 96.dp),
+                )
+            }
+            if (members.size > MEMBER_CHIP_LIMIT) {
+                Text(
+                    text = "+${members.size - MEMBER_CHIP_LIMIT}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-        if (members.size > MEMBER_CHIP_LIMIT) {
-            Text(
-                text = "+${members.size - MEMBER_CHIP_LIMIT}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
     }
 }
 
