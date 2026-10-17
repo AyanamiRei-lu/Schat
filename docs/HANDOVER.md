@@ -59,7 +59,7 @@
 | 中继服务器 | `cd server && go test ./...` | **116 项通过 + 32 项子测试** |
 | 服务端：零第三方依赖 | `GOWORK=off go list -m all` | 只有自身模块 |
 | 服务端：不导入协议核心 | `GOWORK=off go list -deps ./...` | 依赖树里没有 `protocol` |
-| 客户端核心（纯 JVM） | `cd android && ./gradlew :core:test` | **194 项通过，4 项 SKIP** |
+| 客户端核心（纯 JVM） | `cd android && ./gradlew :core:test` | **236 项，0 失败**（含本次新增的 17 项恢复相关测试） |
 | 客户端编译 | `./gradlew :app:assembleDebug` | 干净构建产出 **27.07 MB** debug APK |
 | CI | GitHub Actions | 三个 job；Go 两个为绿 |
 
@@ -106,6 +106,7 @@ MLS 里最容易出错、也最难发现的，是"某个成员在群变化之后
 |---|---|---|
 | **群聊的双机真机验证** | 协议层有端到端测试，客户端编译通过，**但两台手机互相加人从未实际跑过** | **最高**——这是客户端唯一一块"逻辑测过、界面没过"的地方 |
 | **相机扫码** | `ui/qr/QrScannerScreen.kt` 存在且编译通过 | `AppInfo.kt` **自己承认**："相机扫码路径**未在真机上验证过**：构建环境没有摄像头，只能保证编译通过" |
+| **换机恢复（恢复码 + 备份）** | 加密与编解码有 **17 项 :core 测试**（往返、错词、篡改、换 salt、RFC 5869 向量）；UI 编译通过 | **从未在真机上跑过一次真正的"旧机导出 → 新机导入"**。密码学部分有测试兜底，界面与文件外传的部分没有 |
 | **MLS `UpdatePath` / `Welcome` 的互操作性** | 有自洽性测试与端到端测试，**但没有官方逐字节向量** | 与**其它 MLS 实现**互通未经第三方验证。`SECURITY.md` 里写明了 |
 | **release 构建的体积** | 只测过 debug（27.07 MB） | R8 开启后的体积未知；`README.md` 明说"在测出来之前不声称 release 体积" |
 
@@ -308,6 +309,15 @@ go build ./... && go test ./...
 | `ui/chat/GroupAddMemberScreen.kt` | 选一个人加进群 |
 | `ui/qr/QrImage.kt` | 渲染二维码模块矩阵 |
 | `ui/qr/QrScannerScreen.kt` | 相机扫码（**未在真机验证**） |
+| `ui/ui/BottomBar.kt` | 底边栏（聊天／通讯录／我的）与三个 `Canvas` 线框图标 |
+| `ui/ui/QrDialog.kt` | 二维码弹窗，会话页与「我的」共用 |
+| `ui/home/HomeScreen.kt` | 底边栏框架：内容区在上、底栏在下 |
+| `ui/home/ChatsTab.kt` | 会话列表 + 连接状态 + 空态 |
+| `ui/home/ContactsTab.kt` | 通讯录（紧凑行：只有名字） |
+| `ui/home/MineTab.kt` | 我的：身份、我的二维码、服务器连接码、恢复码 |
+| `ui/home/AddContactScreen.kt` | 添加联系人（扫码／手抄身份公钥） |
+| `ui/home/RecoveryScreen.kt` | 恢复码：查看、复制、导出备份、从备份恢复 |
+| `ui/chat/ConversationScreen.kt` | 单聊窗口（全屏、无底边栏）；`MetadataWarning` / `MessageList` / `Composer` 仍在这个包里供群聊复用 |
 | `ui/theme/Theme.kt` | 主题：白/蓝/黑三族的 Material3 配色、字阶、形状 |
 | `ui/theme/DesignTokens.kt` | 颜色、间距、圆角三个令牌对象；**界面里的裸 `.dp` 和 `Color(0x…)` 应当只有这一处** |
 | `ui/theme/Gradients.kt` | 全应用**唯一**的渐变：相机取景框的描边（理由见下） |
@@ -332,6 +342,12 @@ go build ./... && go test ./...
   用连接状态当键会让界面随每一次状态更新闪烁。
 - **文案里不用 emoji**：表情符号会把一行严肃提示变成一句口号，而警告的分量应当由颜色与
   位置承担（例：元数据警告现在是一条 3dp 红竖线 + 一行 bodySmall 小字）。
+- **界面分三层**：底边栏三页（聊天／通讯录／我的）→ 子页（加人、恢复码、群）→ 全屏会话。
+  会话是全屏、无底边栏的，因为底边栏回答的是"我在哪一页"，进到一段对话里它就没有意义了。
+- **换机恢复是"恢复码 + 备份"两件东西**。恢复码的 24 个词是独立随机熵，**从未参与保险库
+  密钥派生**，所以单独 24 个词在数学上还原不出身份——任何声称只凭它就能恢复的实现都在骗人。
+  实现见 `core/recovery/`：恢复码当密钥（HKDF-SHA256）、备份当密文（AES-256-GCM），
+  备份里的预密钥池**不入档**，恢复时重新生成（旧设备消费过的预密钥不能重发）。
 - **改过界面代码后必须 `--rerun-tasks`**（见第 10.3 节），并且 `MaterialTheme.shapes` 的类型
   是 Material3 自己的 `Shapes`——往它上面加属性是不行的，需要胶囊形时显式用
   `SchatShapes.Pill`。同理，`GradientCard` 的 `borderBrush`／`elevation` 是**保留参数、
@@ -611,7 +627,7 @@ powershell -ExecutionPolicy Bypass -File tools/verify.ps1
 |---|---|
 | protocol **305 通过 / 49 子测试 / 1 SKIP** | `cd protocol && go test ./... -count=1 -v` 后数 `--- PASS` 行 |
 | server **116 通过 / 32 子测试** | `cd server && go test ./... -count=1 -v` |
-| `:core` **194 通过 / 4 SKIP** | `cd android && ./gradlew :core:test`；或数 `android/core/build/test-results/test/*.xml` |
+| `:core` **236 项，0 失败** | `cd android && ./gradlew :core:test`；或数 `android/core/build/test-results/test/*.xml`（含新增的 17 项恢复测试） |
 | APK **27.07 MB** | `./gradlew clean :app:assembleDebug` 后看 `android/app/build/outputs/apk/debug/`；**不要用增量构建的结果** |
 | AAR **10.18 MB** | `tools/build-protocol.ps1` 的输出 |
 | 部署内存 **2.7 MB** | 服务器上 `systemctl status schat-server` |

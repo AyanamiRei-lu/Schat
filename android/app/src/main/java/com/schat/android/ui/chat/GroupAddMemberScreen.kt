@@ -70,7 +70,6 @@ fun GroupAddMemberScreen(
 
             ScreenHeader(
                 title = "加人进群",
-                subtitle = "身份由签名密钥决定：备注名只影响显示，不影响加进来的是谁。",
                 onBack = onBack,
                 backLabel = "返回",
             )

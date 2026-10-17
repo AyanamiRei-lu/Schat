@@ -86,7 +86,7 @@ fun LegalScreen(
         Column(modifier = rootModifier) {
             ScreenHeader(
                 title = document.title,
-                subtitle = "版本 v${document.version} · 文本与仓库 docs/legal/ 逐字节相同",
+                subtitle = "v${document.version}",
                 onBack = onBack,
                 backLabel = "返回",
             )

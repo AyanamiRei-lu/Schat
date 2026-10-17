@@ -52,6 +52,13 @@ fun ContactRows(
     onOpen: (String) -> Unit,
     onRename: (String, String) -> Unit,
     onDelete: (String) -> Unit,
+    /**
+     * 只显示名字。
+     *
+     * 「聊天」页回答"最近谁找过我"，所以要有预览、时间和未读；「通讯录」页回答"我认识谁"，
+     * 那些信息只会让两个页看起来一样。
+     */
+    compact: Boolean = false,
 ) {
     var renaming by remember { mutableStateOf<Contact?>(null) }
     var deleting by remember { mutableStateOf<Contact?>(null) }
@@ -60,6 +67,7 @@ fun ContactRows(
         contacts.forEach { contact ->
             ContactRow(
                 contact = contact,
+                compact = compact,
                 onOpen = { onOpen(contact.identityHex) },
                 onRename = { renaming = contact },
                 onDelete = { deleting = contact },
@@ -94,6 +102,7 @@ fun ContactRows(
 @Composable
 private fun ContactRow(
     contact: Contact,
+    compact: Boolean,
     onOpen: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
@@ -112,7 +121,7 @@ private fun ContactRow(
         GradientAvatar(
             label = contact.displayName,
             hue = hueOf(contact.identityHex),
-            size = 44.dp,
+            size = if (compact) 40.dp else 44.dp,
         )
 
         Column(modifier = Modifier.weight(1f)) {
@@ -120,36 +129,36 @@ private fun ContactRow(
                 Text(
                     text = contact.displayName,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = timeLabel(contact.lastMessageAtMillis),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (!compact) {
+                    Text(
+                        text = timeLabel(contact.lastMessageAtMillis),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            if (!compact) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = previewLine(contact),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (contact.unread > 0) UnreadPill(contact.unread)
+                }
+            } else if (!contact.isNamed) {
+                // 通讯录里只补一行身份缩写：没有备注名时，光看"ac12abcd…"分不清是谁，
+                // 而这一行至少能让用户去核对。
                 Text(
-                    text = previewLine(contact),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (contact.unread > 0) UnreadPill(contact.unread)
-            }
-
-            if (!contact.isNamed) {
-                // An unnamed contact is shown by its key, and the key is what the user may
-                // still need to compare against the other device. Monospace, because an
-                // abbreviated key in a proportional font is genuinely hard to check.
-                Text(
-                    text = "尚未命名 · ${contact.identityHex.take(16)}…",
+                    text = contact.identityHex.take(16) + "…",
                     style = MaterialTheme.typography.labelSmall,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

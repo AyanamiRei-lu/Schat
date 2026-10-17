@@ -174,7 +174,12 @@ class ChatController(
     // Lifecycle
 
     /** Publishes this client's prekeys and opens the relay connection. */
-    fun start() = onWorker {
+    /**
+     * @param resumeLastConversation false when the caller shows a conversation list on
+     *   launch: reopening the last chat automatically would drop the user straight into
+     *   a chat and hide the list they were about to read.
+     */
+    fun start(resumeLastConversation: Boolean = true) = onWorker {
         if (myMailbox.isEmpty() || myIdentityHex.isEmpty()) {
             update { it.copy(connection = "身份不可用", error = "无法从本地资料中读出身份公钥") }
             return@onWorker
@@ -187,7 +192,9 @@ class ChatController(
         // screen immediately rather than appearing only after the network settles. The
         // history and the ratchet snapshot were both being written to the vault all along;
         // nothing ever read them back, so killing the app looked like losing everything.
-        store.getString(LAST_PEER)?.let { reopenConversation(it) }
+        if (resumeLastConversation) {
+            store.getString(LAST_PEER)?.let { reopenConversation(it) }
+        }
 
         update { it.copy(connection = "正在发布预密钥…") }
 
@@ -1142,6 +1149,69 @@ class ChatController(
 
     /** The peers this device has talked to, most recent first. */
     fun knownPeers(): List<String> = contacts.map { it.identityHex }
+
+    /**
+     * Replaces this device's identity with one restored from a backup.
+     *
+     * # What has to be thrown away, and why
+     *
+     * The session ratchets and message history in the vault belong to the *old* identity:
+     * they are keyed by a session with a peer that the new identity never took part in.
+     * Keeping them would put messages on screen that the restored identity cannot decrypt
+     * and cannot authenticate, which is worse than not having them at all.
+     *
+     * The one-time prekey pool is deliberately **not** taken from the backup. Prekeys are
+     * single-use; republishing a pool that the old device already handed out would make
+     * the relay issue the same prekey twice, which is exactly what the pool exists to
+     * prevent. The caller regenerates a fresh pool for the restored identity.
+     *
+     * # After this returns
+     *
+     * [myIdentityHex] and [myMailbox] are read in the constructor, so a running instance
+     * keeps the old ones. The caller must tear this controller down and build a new one —
+     * the app does that by locking the vault again.
+     */
+    fun restoreFromBackup(
+        restored: ClientProfileData,
+        restoredContacts: List<Contact>,
+        onDone: (Throwable?) -> Unit = {},
+    ) = onWorker {
+        try {
+            session?.close()
+            session = null
+            peerMailbox = ""
+
+            // Everything keyed to the previous identity goes.
+            store.names().toList()
+                .filter {
+                    it.startsWith(SESSION_PREFIX) ||
+                        it.startsWith(HISTORY_PREFIX) ||
+                        it == LAST_PEER
+                }
+                .forEach { store.remove(it) }
+
+            profileStore.save(restored)
+            profile = restored
+
+            contacts = restoredContacts.take(ContactCodec.MAX_CONTACTS)
+            publishContacts()
+            store.putString(CONTACTS, ContactCodec.encode(contacts))
+
+            update {
+                it.copy(
+                    peerIdentityHex = "",
+                    safetyNumber = "",
+                    messages = emptyList(),
+                    contacts = contacts,
+                    connection = "已从备份恢复",
+                    error = null,
+                )
+            }
+            onDone(null)
+        } catch (e: Exception) {
+            onDone(e)
+        }
+    }
 
     // ------------------------------------------------------------------
 

@@ -66,7 +66,7 @@ fun GroupListScreen(
 
             ScreenHeader(
                 title = "群组",
-                subtitle = "本机保存了 ${groups.size} 个群；群名与成员由协议核心回答。",
+                subtitle = if (groups.isEmpty()) null else "${groups.size} 个群",
                 onBack = onBack,
                 backLabel = "返回",
             )

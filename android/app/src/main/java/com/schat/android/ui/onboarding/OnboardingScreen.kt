@@ -89,7 +89,7 @@ fun OnboardingScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             ScreenHeader(
                 title = "设置 SCHAT",
-                subtitle = "身份、口令与服务器都只在这台设备上生成；服务器不保存任何一项。",
+                subtitle = "所有材料只在这台设备上生成。",
                 body = {
                     StatusPill(
                         text = "第 ${stepIndex + 1} / $stepCount 步 · ${state.step.title()}",

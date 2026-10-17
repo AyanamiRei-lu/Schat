@@ -15,6 +15,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -34,18 +35,28 @@ import com.schat.android.core.crypto.VaultSession
 import com.schat.android.core.onboarding.OnboardingState
 import com.schat.android.core.profile.ClientProfileData
 import com.schat.android.core.profile.ClientProfileStore
+import com.schat.android.core.recovery.ProfileBackup
+import com.schat.android.core.recovery.ProfileBackupCodec
+import com.schat.android.core.recovery.RecoveryBackup
 import com.schat.android.data.store.EncryptedStore
-import com.schat.android.ui.chat.ChatScreen
+import com.schat.android.ui.chat.ConversationScreen
+import com.schat.android.ui.home.AddContactScreen
+import com.schat.android.ui.home.HomeScreen
+import com.schat.android.ui.home.RecoveryScreen
 import com.schat.android.ui.onboarding.OnboardingScreen
 import com.schat.android.ui.theme.Dimens
 import com.schat.android.ui.ui.ContentColumn
 import com.schat.android.ui.ui.FadeSwap
 import com.schat.android.ui.ui.GradientButton
 import com.schat.android.ui.ui.GradientCard
+import com.schat.android.ui.ui.HomeTab
 import com.schat.android.ui.ui.ScreenBackground
 import com.schat.android.ui.ui.ScreenHeader
 import com.schat.android.ui.ui.SectionLabel
 import com.schat.android.ui.ui.StatusPill
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -223,7 +234,13 @@ fun SchatRoot() {
                 },
             )
 
-            is Stage.Ready -> ChatRoute(profile = current.profile, store = current.store)
+            is Stage.Ready -> ChatRoute(
+                profile = current.profile,
+                store = current.store,
+                // 恢复备份之后身份变了：锁上保险库，逼整条链路重建。
+                // 控制器把 myIdentityHex / 邮箱在构造时就算好了，换身份只能换一个新实例。
+                onProfileReplaced = { stage = Stage.Locked },
+            )
         }
     }
 }
@@ -336,7 +353,11 @@ private inline fun <T> com.schat.android.core.crypto.VaultKey.use(block: (com.sc
  * the main thread instead of written inline.
  */
 @Composable
-private fun ChatRoute(profile: ClientProfileData, store: EncryptedStore) {
+private fun ChatRoute(
+    profile: ClientProfileData,
+    store: EncryptedStore,
+    onProfileReplaced: () -> Unit,
+) {
     val parsed = remember(profile.serverUri) { ServerConfig.parse(profile.serverUri) }
     val config = parsed.getOrNull()
 
@@ -352,19 +373,26 @@ private fun ChatRoute(profile: ClientProfileData, store: EncryptedStore) {
     }
 
     val main = remember { Handler(Looper.getMainLooper()) }
+    val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf(ChatState()) }
     var myIdentity by remember { mutableStateOf("") }
 
-    // 当前打开的群；为 null 时显示单聊界面。
+    // 底边栏当前页。
+    var tab by remember { mutableStateOf(HomeTab.Chats) }
+    var showAddContact by remember { mutableStateOf(false) }
+    var showRecovery by remember { mutableStateOf(false) }
+    var restoreBusy by remember { mutableStateOf(false) }
+    var restoreError by remember { mutableStateOf<String?>(null) }
+
+    // 当前打开的群；为 null 时不显示群会话。
     var openGroup by remember {
         mutableStateOf<com.schat.android.core.groups.GroupRecord?>(null)
     }
 
-    // 界面层次：群列表 → 群会话 → 会话界面。两者都为 false/空时显示会话界面。
+    /** 群列表在群会话之上：打开列表总是优先于"某个群还开着"。 */
     var showGroupList by remember { mutableStateOf(false) }
 
-    // 是否正在从联系人里挑一个人加进当前群。它比群界面更靠前一层：
-    // 选人 → 群列表 → 群 → 会话界面。
+    /** 选人加群：比群界面更靠前一层。 */
     var showAddMember by remember { mutableStateOf(false) }
 
     val controller = remember {
@@ -373,13 +401,14 @@ private fun ChatRoute(profile: ClientProfileData, store: EncryptedStore) {
 
     DisposableEffect(Unit) {
         myIdentity = controller.myIdentity()
-        controller.start()
+        // 不自动重开上次的会话：主界面是会话列表，直接跳进某段对话会把列表藏起来。
+        controller.start(resumeLastConversation = false)
         onDispose { controller.stop() }
     }
 
     // 群会话：打开时先渲染群界面并返回，单聊界面保持原样。
-    // 用早返回而不是包裹 ChatScreen 调用，是为了让这次改动是一处【插入】而不是一次【重排】——
-    // 重排一个多行调用会让 diff 无法阅读，也更容易改错。
+    // 用早返回而不是把主界面包进一个大 when，是为了让增删一屏永远是一处【插入】而不是
+    // 一次【重排】——重排一个多行调用会让 diff 无法阅读，也更容易改错。
     // 群列表：从会话界面的「群组」按钮进入。放在群会话分支之前，所以"打开列表"
     // 总是优先于"某个群还开着"。
     if (showGroupList) {
@@ -490,32 +519,135 @@ private fun ChatRoute(profile: ClientProfileData, store: EncryptedStore) {
         return
     }
 
-    ChatScreen(
-        // 从「选联系人」切到「会话」是一次换屏，用同一个 200ms 淡入淡出。
-        // 用状态本身当 key：对端身份变了就是换了一段会话，也应当有这次转场。
-        fadeKey = state.peerIdentityHex,
+    // 添加联系人：从「通讯录」的 ＋ 进入。
+    if (showAddContact) {
+        AddContactScreen(
+            onStartSession = { identity ->
+                // 两个调用都排在同一条 worker 线程上，顺序是确定的：会话请求先发出，
+                // 再打开这段会话，所以用户看到的是"请求已发出"的对话窗口。
+                controller.startSessionWith(identity)
+                controller.openConversation(identity)
+                showAddContact = false
+            },
+            onBack = { showAddContact = false },
+        )
+        return
+    }
+
+    // 恢复码：查看、导出备份、从备份恢复。
+    if (showRecovery) {
+        RecoveryScreen(
+            recoveryCode = profile.recoveryCode,
+            onCreateBackup = {
+                val words = profile.recoveryCode.split(Regex("\\s+")).filter { it.isNotBlank() }
+                val payload = ProfileBackupCodec.encode(
+                    ProfileBackup(
+                        identityJson = profile.identityJson,
+                        routeKeyHex = profile.routeKeyHex,
+                        recoveryCode = profile.recoveryCode,
+                        serverUri = profile.serverUri,
+                        contacts = state.contacts,
+                    ),
+                )
+                RecoveryBackup.seal(payload, words)
+            },
+            onRestore = { envelope, words ->
+                restoreBusy = true
+                restoreError = null
+                scope.launch {
+                    val prepared = runCatching {
+                        withContext(Dispatchers.IO) { prepareRestore(envelope, words) }
+                    }
+                    prepared.fold(
+                        onSuccess = { restored ->
+                            controller.restoreFromBackup(restored.first, restored.second) { failure ->
+                                main.post {
+                                    if (failure == null) {
+                                        // 身份换了，控制器里缓存的 myIdentityHex / 邮箱
+                                        // 都是旧的：只能锁上保险库，让整条链路重建。
+                                        onProfileReplaced()
+                                    } else {
+                                        restoreBusy = false
+                                        restoreError = failure.message ?: "恢复失败"
+                                    }
+                                }
+                            }
+                        },
+                        onFailure = { failure ->
+                            restoreBusy = false
+                            restoreError = failure.message ?: "恢复失败"
+                        },
+                    )
+                }
+            },
+            restoreBusy = restoreBusy,
+            restoreError = restoreError,
+            onBack = { showRecovery = false },
+        )
+        return
+    }
+
+    // 打开了一段会话：全屏，不带底边栏。
+    if (state.peerIdentityHex.isNotEmpty()) {
+        ConversationScreen(
+            state = state,
+            onSend = { controller.send(it) },
+            onBack = { controller.closeConversation() },
+        )
+        return
+    }
+
+    HomeScreen(
+        tab = tab,
+        onTab = { tab = it },
         state = state,
         myIdentity = myIdentity,
         serverUri = profile.serverUri,
-        onStartSession = { controller.startSessionWith(it) },
-        onSend = { controller.send(it) },
+        serverDisplay = "${config.host}:${config.port}",
         onOpenConversation = { controller.openConversation(it) },
-        onLeaveConversation = { controller.closeConversation() },
-        onCreateGroup = {
+        onAddContact = { showAddContact = true },
+        onNewGroup = {
             // 建群后立刻打开它，用户不必再去列表里找。
             val created = controller.createGroup()
             if (created != null) {
                 openGroup = com.schat.android.core.groups.GroupStore(store).load(created)
             }
         },
-        onOpenGroups = {
-            // 打开群列表，而不是硬开第一个群：在列表存在之前，用户既不能选择打开哪一个，
-            // 也无从知道本机到底有几个群。
-            showGroupList = true
-        },
+        onOpenGroups = { showGroupList = true },
         onRenameContact = { peer, name -> controller.renameContact(peer, name) },
         onDeleteContact = { controller.deleteContact(it) },
+        onOpenRecovery = { showRecovery = true },
     )
+}
+
+/**
+ * 解一份备份，得到可以直接写进保险库的档案与联系人。
+ *
+ * 在 IO 线程上跑：它要做 HKDF、AES-GCM 和一次 Go 调用（生成新的预密钥池）。
+ *
+ * **预密钥一定重新生成。** 备份里没有预密钥池，就算有也不能用：一次性预密钥只能用一次，
+ * 旧设备已经发出去的那些如果重新发布，中继会把同一个预密钥发给两个人——那正是预密钥池
+ * 存在的理由。
+ */
+private fun prepareRestore(
+    envelope: String,
+    words: List<String>,
+): Pair<ClientProfileData, List<com.schat.android.core.contacts.Contact>> {
+    val opened = RecoveryBackup.open(envelope, words)
+    val backup = ProfileBackupCodec.decode(opened)
+        ?: throw IllegalStateException("备份内容不完整")
+    ServerConfig.parse(backup.serverUri).getOrElse {
+        throw IllegalStateException("备份里的服务器地址无法解析：${it.message}")
+    }
+
+    val restored = ClientProfileData(
+        identityJson = backup.identityJson,
+        prekeyStoreJson = mobile.Mobile.createPreKeyStore(backup.identityJson, PREKEY_POOL_SIZE),
+        routeKeyHex = backup.routeKeyHex.ifBlank { mobile.Mobile.newRouteKey() },
+        recoveryCode = backup.recoveryCode,
+        serverUri = backup.serverUri,
+    )
+    return restored to backup.contacts
 }
 
 /**

@@ -83,7 +83,7 @@ fun GroupScreen(
 
             ScreenHeader(
                 title = groupName,
-                subtitle = "本机保存的成员名单 · 共 ${members.size} 人",
+                subtitle = "共 ${members.size} 人",
                 onBack = onBack,
                 backLabel = "返回",
                 actions = {
