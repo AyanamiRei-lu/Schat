@@ -1,6 +1,9 @@
 # ---- Go ----
 /server/schat-server
 /server/schat-server.exe
+# 交叉编译产出的发布二进制（Windows 上编译 Linux 版本时落在 dist/）。
+# 它和上面的 schat-server 一样是构建产物，不该进仓库。
+/server/dist/
 /build/
 *.test
 *.out
