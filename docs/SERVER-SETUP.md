@@ -215,16 +215,25 @@ sudo tee /etc/schat/config.json >/dev/null <<'JSON'
 {
   "mode": "buffer",
   "buffer": {
-    "ttl": "72h",
     "max_per_token": 100,
     "max_global_memory": 134217728
   }
 }
 JSON
-sudo chmod 600 /etc/schat/config.json
+sudo chown root:schat /etc/schat/config.json
+sudo chmod 640 /etc/schat/config.json
 ```
 
-> 配置文件的规则：**省略的字段沿用默认值**；**拼错的字段名会让启动直接失败**（不是静默忽略）；**命令行参数优先于配置文件**。三项 buffer 界限都必须大于 0。
+> 配置文件的规则：**省略的字段沿用默认值**（所以 `ttl` 不写就是默认 72 小时）；**拼错的字段名会让启动直接失败**（不是静默忽略）；**命令行参数优先于配置文件**。三项 buffer 界限都必须大于 0。
+
+> ⚠️ **两个踩过的坑，都在这一步**
+>
+> 1. **`ttl` 不能用 `"72h"` 这种字符串。** `Buffer.TTL` 的类型是 `time.Duration`，而配置文件是普通 JSON 解码——`time.Duration` 在 JSON 里只接受**整数纳秒**。写 `"72h"` 会让进程启动即退出（`status=1`），日志是 `cannot unmarshal string into Go struct field`。要么省略 `ttl` 吃默认值（推荐），要么写 `259200000000000`。
+> 2. **`chmod 600` 会让服务读不到这个文件。** unit 里是 `User=schat`，而 600 意味着只有 root 能读——进程启动即退出，日志是 `config: reading /etc/schat/config.json: permission denied`。用 `chown root:schat` + `chmod 640`，然后确认服务账号确实读得到：
+>
+>    ```bash
+>    sudo -u schat head -c 40 /etc/schat/config.json; echo
+>    ```
 
 **第二步：改 systemd（用 override，别改包里的 unit）**
 
@@ -251,6 +260,10 @@ sudo systemctl status schat-server --no-pager
 ```
 
 **第三步：验证**
+
+> **如果 `systemctl status` 显示 `activating (auto-restart)` / `status=1/FAILURE`，先看完整的日志**：
+> `sudo journalctl -u schat-server -n 30 --no-pager`。**不要加 `grep`**——上面那两个坑的报错行
+> 恰好都不含 `buffer mode` 之类的关键词，一 grep 就全被滤掉，只剩下"启动失败了"这个结论。
 
 1. 启动日志里应有 `buffer mode enabled: envelopes are held in RAM only and are lost on restart`；
 2. 健康端点显示 `"mode":"buffer"`、`"storage":"ram-only"`，且 `retention` 里带着你设的三个界限：
