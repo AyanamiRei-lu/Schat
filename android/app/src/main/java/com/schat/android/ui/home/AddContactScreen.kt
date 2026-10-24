@@ -37,6 +37,13 @@ import com.schat.android.ui.ui.isDarkNow
 fun AddContactScreen(
     onStartSession: (String) -> Unit,
     onBack: () -> Unit,
+    /**
+     * 上一次尝试失败的原因。
+     *
+     * 界面上要停在这一页把话说完，而不是跳到主界面再说：失败最常见的原因是身份抄错、
+     * 或者对方还没发布预密钥，两种都要求用户在这里改一下再试。
+     */
+    error: String? = null,
 ) {
     var peer by remember { mutableStateOf("") }
     var scanning by remember { mutableStateOf(false) }
@@ -95,6 +102,14 @@ fun AddContactScreen(
                 )
 
                 note?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+
+                error?.let {
                     Text(
                         text = it,
                         style = MaterialTheme.typography.bodySmall,

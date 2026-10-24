@@ -12,6 +12,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -522,15 +523,18 @@ private fun ChatRoute(
     // 添加联系人：从「通讯录」的 ＋ 进入。
     if (showAddContact) {
         AddContactScreen(
-            onStartSession = { identity ->
-                // 两个调用都排在同一条 worker 线程上，顺序是确定的：会话请求先发出，
-                // 再打开这段会话，所以用户看到的是"请求已发出"的对话窗口。
-                controller.startSessionWith(identity)
-                controller.openConversation(identity)
-                showAddContact = false
-            },
+            // 只排队发送握手。会话视图由控制器自己打开（握手指令发出之后），所以这里
+            // 不再调用 openConversation——那会把对方直接写进联系人，而"写联系人"必须等
+            // 服务器回执确认送达之后（见 ChatController.startSessionWith 的注释）。
+            onStartSession = { controller.startSessionWith(it) },
             onBack = { showAddContact = false },
+            error = state.error,
         )
+
+        // 会话视图一出现，说明握手已经交给中继，这时才离开这一页；失败则停在这里看原因。
+        LaunchedEffect(state.peerIdentityHex) {
+            if (state.peerIdentityHex.isNotEmpty()) showAddContact = false
+        }
         return
     }
 

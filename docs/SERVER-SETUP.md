@@ -59,7 +59,7 @@ go build -o schat-server ./cmd/schat-server
 | 配置项 | 默认值 | 说明 |
 |---|---|---|
 | `listen` | `0.0.0.0:8443` | 监听地址 |
-| `mode` | `live` | **不存储任何数据** |
+| `mode` | `live` | `live` 不存储任何数据；`buffer` 会在内存里暂存（见 §5.2） |
 | `name` | `schat` | 客户端显示的名称 |
 | `metrics_listen` | `127.0.0.1:9090` | 指标端点 |
 | `tls` | 自签名 | 无需域名即可工作 |
@@ -86,6 +86,12 @@ curl -k https://127.0.0.1:18443/api/v1/health
   "protocol": "SCS-1/v1",
   "mode": "live",
   "storage": "none",
+  "retention": {
+    "mode": "live",
+    "on_disk": false,
+    "queued": false,
+    "note": "an offline recipient's envelope is refused, not stored"
+  },
   "fingerprint": "<这台服务器的证书指纹>",
   "live_connections": 0,
   "uptime_seconds": 4.8,
@@ -176,11 +182,99 @@ curl -k https://127.0.0.1:18443/api/v1/health
 **其他部署要点：**
 
 1. **不需要域名，也不需要 Let's Encrypt。** 客户端**固定证书指纹**，所以直接跑自签名证书 + 公网 IP 即可，把服务器打印的那条 `schat://connect?...&fp=...` 发给人就行。这省掉了域名、证书与反向代理。（域名备案等问题请以你的服务商与所在地要求为准，本文件不构成法律意见。）
-2. **保持 `live` 模式**（默认）则服务器**什么都不存**；若希望对方离线时消息暂存一下，用 `--mode buffer`，但那也**只在内存里**，重启即丢。
+2. **保持 `live` 模式**（默认）则服务器**什么都不存**；若希望对方离线时消息暂存一下，切到 `buffer` 模式——**具体步骤、内存陷阱与代价见 §5.2**。
 3. **服务器重启会清空预密钥目录**（纯内存）。客户端会在每次连上时自动重新发布，所以不需要人工干预，但**重启瞬间对方取包会得到 404**。
 4. **指标端口默认只绑 `127.0.0.1:9090`**，不要把它暴露到公网。
 5. **运维方能看到什么、看不到什么**（给他人开服务器时应当如实告知）：看不到任何消息内容；**能看到** IP 地址、连接时间、投递令牌流量，以及——由于当前 MVP 的信箱地址由公开身份派生——**哪些身份正在活动**。见 `SECURITY.md` 第 3 节。
 6. 加固建议：仅密钥登录 SSH、开启自动安全更新、防火墙只放行 8443（与 SSH），并考虑对 8443 做连接频率限制。
+
+#### 5.2 开启 buffer 模式（离线暂存）
+
+> **先读这一段再动手。** 这不是一个"性能开关"，它改变的是**服务器对外承诺的内容**。
+
+**它解决什么**：`live` 模式下，收件人不在线时服务器直接回 `offline` 并丢弃信封——于是"对方离线时发的消息"和"对方离线时发来的添加请求"都永远到不了。`buffer` 模式把这些信封在**内存里**留一段时间，收件人上线订阅信箱时排空给他。
+
+**它不解决什么**（每一条都会真的丢消息）：
+
+| 情况 | 结果 |
+|---|---|
+| 服务器重启 | 内存队列全丢（设计如此，进程不落盘） |
+| 超过 `buffer.ttl`（默认 72 小时） | 过期清掉 |
+| 单信箱超过 `buffer.max_per_token`（默认 100 条） | **挤掉最老的**，离线被刷屏的人回来只能看到最后 100 条 |
+| 排空时连接中途断开 | `Drain` 是先删后写，剩下那批永久丢失（已知缺陷，见 `docs/OFFLINE-DELIVERY-PLAN.md` §3） |
+
+**第一步：确认内存上限（最容易踩的坑）**
+
+systemd 单元里写着 `MemoryMax=256M`，而 buffer 的默认全局预算是 **512 MiB**。直接开 buffer，**队列还没到自己的上限，cgroup 就会先把进程 OOM 杀掉**。
+
+而 `buffer.max_global_memory` **没有命令行参数**，只能写在配置文件里。所以要故意把预算调到 256 MiB 以内（示例取 128 MiB，给 Go 运行时和多连接留余量）：
+
+```bash
+sudo mkdir -p /etc/schat
+sudo tee /etc/schat/config.json >/dev/null <<'JSON'
+{
+  "mode": "buffer",
+  "buffer": {
+    "ttl": "72h",
+    "max_per_token": 100,
+    "max_global_memory": 134217728
+  }
+}
+JSON
+sudo chmod 600 /etc/schat/config.json
+```
+
+> 配置文件的规则：**省略的字段沿用默认值**；**拼错的字段名会让启动直接失败**（不是静默忽略）；**命令行参数优先于配置文件**。三项 buffer 界限都必须大于 0。
+
+**第二步：改 systemd（用 override，别改包里的 unit）**
+
+包里那份 unit 写死了 `--mode live`，直接编辑它会在下次安装时被覆盖：
+
+```bash
+sudo systemctl edit schat-server
+```
+
+在编辑器里写入（**`ExecStart=` 的空值那行不能省**，否则 systemd 会认为你是在追加第二条启动命令，结果是两个进程抢同一个端口）：
+
+```ini
+[Service]
+ExecStart=
+ExecStart=/usr/local/bin/schat-server --config /etc/schat/config.json --state-dir /var/lib/schat $SCHAT_PUBLIC_HOST
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart schat-server
+sudo systemctl status schat-server --no-pager
+```
+
+**第三步：验证**
+
+1. 启动日志里应有 `buffer mode enabled: envelopes are held in RAM only and are lost on restart`；
+2. 健康端点显示 `"mode":"buffer"`、`"storage":"ram-only"`，且 `retention` 里带着你设的三个界限：
+
+   ```bash
+   curl -sk https://127.0.0.1:8443/api/v1/health
+   ```
+
+   > 健康端点在**主端口** `/api/v1/health`（默认 8443，用 `https` + `-k`，因为证书是自签的）。`/metrics` 才在 `127.0.0.1:9090`，两者不是同一个端口。
+
+3. 功能验证：让 A 完全退出 App，B 给 A 发一条消息——B 的状态行应显示 **"对端离线，消息已暂存在服务器内存中"**（而不是"未送达"）；A 重新打开 App 应收到；
+4. 内存观察：跑一阵后 `systemctl show schat-server -p MemoryCurrent`，确认没有贴着 `MemoryMax`。
+
+**第四步：同步口径（不做这一步就是文档在骗人）**
+
+开了 buffer 之后，下面这些说法都需要限定，否则与实际不符：
+
+| 位置 | 现在写的 | 应改为 |
+|---|---|---|
+| `README.md` 能力表 | 服务端零留存 | `live` 模式零留存；`buffer` 模式在内存中暂存，不落盘 |
+| `SCHAT.md` §7 与术语表 | 不解析、不解密、不存储 | 不解析、不解密、**不落盘**；`buffer` 下内存暂存 ≤TTL |
+| `SECURITY.md` §4 | 把"服务端暂存"列为严重威胁 | 说明这是需要运维方显式开启、且必须在用户协议里披露的模式 |
+| `docs/RELAY-API.md` §3 | 不解析、不存储、不解密 | 同 §7 的限定 |
+| 隐私政策 / 儿童规则 | "不收集、不存储、不分析"消息内容 | **需要运营方判断**：内存中 ≤72h 的密文是否仍属"存储"。若改动，必须提升文档版本号并重新取得同意（客户端按版本记录同意） |
+
+> 最后一行**不是技术决定**。`docs/legal/` 里的文本是逐字节同步到 `assets/legal/` 的，客户端会解析版本号并记录同意——改一个字就是一次重新同意。**在对外提供服务之前，这件事应当先由做运营决定的人拍板。**
 
 ### 6. systemd 部署
 

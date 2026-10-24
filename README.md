@@ -66,7 +66,7 @@
 | **安全码双方均可计算** | `TestBothPeersCanComputeTheSafetyNumber` | ✅ 两侧算出的 60 位数字完全相同 |
 | **预密钥整池发布** | `TestPublishBundleJSONCarriesTheWholePool` | ✅ 100 个一次性预密钥一次发布，而非只发布 1 个 |
 | 并发安全 | `go test -race ./...` | ✅ 无竞态 |
-| 服务端零留存 | `live` 模式连队列都不创建；不落盘 | ✅ 代码结构保证 |
+| 服务端零留存 | `live` 模式（默认）连队列都不创建、不落盘；`buffer` 模式只在内存暂存（见 `docs/SERVER-SETUP.md` §5.2） | ✅ 两种模式都不落盘 |
 | 服务端零依赖 | `go list -m all`（`GOWORK=off`）仅自身模块 | ✅ 机械校验 |
 | 服务端无解密代码 | `go list -deps ./...` 不含协议核心 | ✅ 机械校验 |
 | 服务端内存（TLS 开启） | 实测 WorkingSet | ✅ **10.9 MB**（预算 < 20 MB） |

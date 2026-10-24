@@ -201,7 +201,7 @@ graph TB
 | 协议层（SCS-1） | 密钥协商、棘轮、加解密、分块 | 不做网络 IO，不写文件 |
 | 存储层 | 本地加密库、媒体缓存 | 不发网络请求 |
 | 网络层 | WebSocket/WebRTC 传输 | 不做任何加解密（透传密文） |
-| 服务器 | 转发、在线状态、P2P 信令 | **不解析、不解密、不存储、不索引** |
+| 服务器 | 转发、在线状态、P2P 信令 | **不解析、不解密、不落盘、不索引**（`buffer` 模式下在内存中按 §7.3 的边界暂存） |
 
 ---
 
@@ -1605,7 +1605,7 @@ powershell -ExecutionPolicy Bypass -File tools\verify.ps1
 | **TOFU** | Trust On First Use | 首次使用即信任，后续变化报警 |
 | **投递令牌** | Delivery Token | 服务器眼中的匿名信箱地址，每 24 小时轮换 |
 | **密封发件人** | Sealed Sender | 信封中不包含发送者身份信息 |
-| **零留存** | Zero Retention | 服务器不保存任何用户数据 |
+| **零留存** | Zero Retention | 服务器不落盘保存任何用户数据；`buffer` 模式下密文信封可在内存中暂存至 TTL（§7.3） |
 
 ---
 

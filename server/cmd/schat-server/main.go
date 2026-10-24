@@ -422,7 +422,7 @@ func printBanner(cfg config.Config, stateDir, fingerprint string, noTLS bool, lo
 		"mode", cfg.Mode,
 		"listen", cfg.Listen,
 		"public_host", host,
-		"storage", "none")
+		"storage", storageDescription(cfg))
 
 	if cfg.Mode == config.ModeLive {
 		log.Info("retention policy: nothing is written to disk and nothing is queued")
@@ -452,6 +452,41 @@ var startupNotices = []string{
 		"without knowing or caring that they are group envelopes",
 }
 
+// storageDescription answers the question an operator actually asks: does this relay
+// hold anything at all?
+//
+// In live mode nothing is ever stored. In buffer mode envelopes are held in RAM for a
+// bounded time — still never on disk, still never decrypted, but a different promise,
+// and reporting it as "none" would be false.
+func storageDescription(cfg config.Config) string {
+	if cfg.Mode == config.ModeLive {
+		return "none"
+	}
+	return "ram-only"
+}
+
+// retentionPolicy spells out buffer mode's bounds so an operator can verify them from
+// the health endpoint instead of trusting the command line.
+func retentionPolicy(cfg config.Config) map[string]any {
+	if cfg.Mode == config.ModeLive {
+		return map[string]any{
+			"mode":    "live",
+			"on_disk": false,
+			"queued":  false,
+			"note":    "an offline recipient's envelope is refused, not stored",
+		}
+	}
+	return map[string]any{
+		"mode":                      "buffer",
+		"on_disk":                   false,
+		"queued":                    true,
+		"ttl_seconds":               int64(cfg.Buffer.TTL.Seconds()),
+		"max_envelopes_per_mailbox": cfg.Buffer.MaxPerToken,
+		"max_bytes":                 cfg.Buffer.MaxGlobalMemory,
+		"note": "ciphertext envelopes are held in RAM only and are lost on restart",
+	}
+}
+
 func healthHandler(cfg config.Config, c *metrics.Counters, gw *gateway.Gateway, keys *directory.Directory, fingerprint string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -467,7 +502,11 @@ func healthHandler(cfg config.Config, c *metrics.Counters, gw *gateway.Gateway, 
 			"version":          version.Version,
 			"protocol":         version.Protocol,
 			"mode":             cfg.Mode,
-			"storage":          "none",
+			// "none" used to be hardcoded here, which meant the health endpoint kept
+			// claiming the relay stores nothing even after buffer mode was switched on.
+			// That is exactly the kind of lie this project forbids in its own docs.
+			"storage":          storageDescription(cfg),
+			"retention":        retentionPolicy(cfg),
 			"uptime_seconds":   snap.UptimeSeconds,
 			"live_connections": gw.ConnCount(),
 			"fingerprint":      fingerprint,

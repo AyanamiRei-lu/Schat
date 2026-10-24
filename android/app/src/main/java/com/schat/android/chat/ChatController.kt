@@ -161,6 +161,37 @@ class ChatController(
      */
     private var contacts: List<Contact> = emptyList()
 
+    /**
+     * 已经交给 socket、但还没拿到服务器回执的投递，最老的在前。
+     *
+     * # 为什么需要这个队列
+     *
+     * 服务器的回执（`delivered` / `queued` / `offline` / `err`）**不带任何标识**，只说
+     * "你刚才那一封"怎么了。而 WebSocket 保序、服务器对每封信封恰好回一次，所以"回执
+     * 的顺序 = 投递的顺序"。有了这条队列，才能把回执对应回具体是哪一次发送——否则
+     * 客户端只能像以前那样，把"字节写进 socket"当成"已经送到"，那是在撒谎。
+     *
+     * 只在 worker 线程上读写（所有发送与 [handleControl] 都在那里），所以不需要加锁。
+     */
+    private val pendingDeliveries = ArrayDeque<PendingDelivery>()
+
+    /** 一次等待回执的投递。群信封只为对齐顺序，不改变任何界面状态。 */
+    private sealed interface PendingDelivery {
+        /** 建立会话的握手信封；回执决定这次"添加"算不算成功。 */
+        data class Handshake(val peer: String) : PendingDelivery
+
+        /** 一条私聊消息；回执决定它标"已送达"还是"发送失败"。 */
+        data class Message(
+            val id: Long,
+            val peer: String,
+            val atMillis: Long,
+            val preview: String,
+        ) : PendingDelivery
+
+        /** 群消息 / 群提交 / 群邀请：只占一个位置，让后面的回执不会错位。 */
+        data object Group : PendingDelivery
+    }
+
     /** Set once the heartbeat timer is scheduled, so reconnects do not stack timers. */
     private var heartbeatStarted = false
 
@@ -323,10 +354,31 @@ class ChatController(
         }
 
         persistSession(peer)
-        announce(peer)
+
+        // 联系人**不在这里写**。以前是在发送之前就 announce，结果是：对方离线、信封被
+        // 服务器丢掉，而我这边的列表里已经有了他——单向成立，用户以为加上了，对方那边
+        // 什么都没有。现在只有服务器回执说"送出去了"（delivered/queued）才写。
+        val known = contacts.any { it.identityHex == peer }
 
         if (relay?.sendEnvelope(wire) == true) {
-            update { it.copy(connection = "已发送会话请求") }
+            pendingDeliveries.addLast(PendingDelivery.Handshake(peer))
+
+            if (known) {
+                // 已经是联系人：正常打开这段会话，等回执回来只更新状态。
+                reopenConversation(peer)
+                update { it.copy(connection = "请求已发出，等待对方确认…", error = null) }
+            } else {
+                // 还不是联系人：先给一个"等待中"的会话视图，但**不写进联系人列表**。
+                update {
+                    it.copy(
+                        peerIdentityHex = peer,
+                        safetyNumber = safetyNumberWith(peer),
+                        messages = emptyList(),
+                        connection = "请求已发出，等待对方上线…",
+                        error = null,
+                    )
+                }
+            }
         } else {
             fail("连接尚未就绪，会话请求未能发出")
         }
@@ -348,13 +400,21 @@ class ChatController(
 
         val id = nextMessageId++
         val now = System.currentTimeMillis()
+        val peer = state.peerIdentityHex
         append(ChatMessage(id, outgoing = true, text = body, atMillis = now, state = DeliveryState.SENDING))
 
         // The list shows the last thing that happened in each conversation, so it is
         // updated on send as well as on receive — a sent message must not badge the user's
         // own inbox, which ContactList.noteMessage handles.
-        contacts = ContactList.noteMessage(contacts, state.peerIdentityHex, now, body, outgoing = true)
-        publishContacts()
+        //
+        // 但只对**已经是联系人**的对端更新：noteMessage 会顺手把对方写进列表，而"还在
+        // 等确认的添加"不该因为用户手快发了一条消息就变成联系人。未确认的那种情况，
+        // 等回执回来、确认送达之后再补写（见 confirmMessage）。
+        val alreadyContact = contacts.any { it.identityHex == peer }
+        if (alreadyContact) {
+            contacts = ContactList.noteMessage(contacts, peer, now, body, outgoing = true)
+            publishContacts()
+        }
 
         val wire = try {
             active.encrypt(peerMailbox, body.toByteArray(Charsets.UTF_8), PROFILE_TEXT)
@@ -365,10 +425,12 @@ class ChatController(
         }
 
         if (relay?.sendEnvelope(wire) == true) {
-            markSent(id)
+            // 交给 socket 不等于送到。消息停在"发送中"，等服务器的回执再定成败——
+            // 以前这里直接 markSent，对方离线时气泡照样显示"已送达服务器"。
+            pendingDeliveries.addLast(PendingDelivery.Message(id, peer, now, body))
             // The ratchet advanced, so the snapshot on disk is now stale. Persisting
             // here is what keeps a restart from replaying a used chain key.
-            persistSession(state.peerIdentityHex)
+            persistSession(peer)
         } else {
             markFailed(id)
             fail("发送失败：连接已断开")
@@ -394,6 +456,8 @@ class ChatController(
     private inner class SocketListener : RelayClient.Listener {
         override fun onConnected() = onWorker {
             resetReconnect()
+            // 上一次连接的未结算投递，其回执已经随连接一起丢了：先如实收尾，再重连。
+            failStaleDeliveries()
             update { it.copy(connection = "已连接", error = null) }
             relay?.subscribe(listOf(myMailbox))
 
@@ -721,6 +785,8 @@ class ChatController(
             fail("群消息未能发出")
             return
         }
+        // 占一个位置，让后面到达的回执不会错位到某条私聊消息上。
+        pendingDeliveries.addLast(PendingDelivery.Group)
 
         // 落在本机历史里，与收到的消息走同一条路——否则自己发的消息重启后会消失。
         runCatching {
@@ -787,7 +853,10 @@ class ChatController(
             }
             // `relay` 是会话级的可空字段（与 sendGroup 的局部 client 不同）：未连接时返回 false，
             // 由下面的 sent == 0 统一报告，而不是在这里抛异常。
-            if (relay?.sendEnvelope(wire) == true) sent++
+            if (relay?.sendEnvelope(wire) == true) {
+                sent++
+                pendingDeliveries.addLast(PendingDelivery.Group)
+            }
         }
         if (sent == 0) {
             fail("群变更未能发出")
@@ -876,7 +945,16 @@ class ChatController(
         persistSession(state.peerIdentityHex)
     }
 
-    /** Surfaces the relay's control replies in the status line. */
+    /**
+     * Surfaces the relay's control replies in the status line, and settles the delivery
+     * they belong to.
+     *
+     * # 为什么必须"结算"
+     *
+     * 这四种回执是唯一能证明"东西真的出去了"的证据。以前它们只被用来改一行状态文字，
+     * 于是界面上出现过两种谎话：消息显示"已送达服务器"而服务器其实回的是 `offline`；
+     * 以及添加好友显示成功而对方根本没收到。现在回执既改状态行，也决定那一次投递的成败。
+     */
     private fun handleControl(json: String) {
         val type = try {
             JSONObject(json).optString("t")
@@ -884,16 +962,122 @@ class ChatController(
             return
         }
         val text = when (type) {
+            // 订阅应答与心跳不是信封回执，不能动队列。
             "ok" -> "已订阅信箱"
-            "delivered" -> "已投递"
+            "delivered" -> {
+                settleDelivery(accepted = true)
+                "已投递"
+            }
+            "queued" -> {
+                settleDelivery(accepted = true)
+                "对端离线，消息已暂存在服务器内存中"
+            }
             // "offline" is not a soft failure: the relay stored nothing, and telling
             // the user the message was delivered would be a lie.
-            "offline" -> "对端离线，消息未送达（服务器不存储）"
-            "queued" -> "对端离线，消息已暂存在服务器内存中"
-            "err" -> "服务器拒绝了请求：${JSONObject(json).optString("m")}"
+            "offline" -> {
+                settleDelivery(accepted = false)
+                "对端离线，消息未送达（服务器不存储）"
+            }
+            "err" -> {
+                settleDelivery(accepted = false)
+                "服务器拒绝了请求：${JSONObject(json).optString("m")}"
+            }
             else -> return
         }
         update { it.copy(connection = text) }
+    }
+
+    /** Applies one reply to the oldest outstanding delivery. */
+    private fun settleDelivery(accepted: Boolean) {
+        val next = pendingDeliveries.removeFirstOrNull() ?: return
+        when (next) {
+            is PendingDelivery.Handshake -> if (accepted) {
+                confirmHandshake(next.peer)
+            } else {
+                abandonHandshake(next.peer)
+            }
+
+            is PendingDelivery.Message -> if (accepted) {
+                confirmMessage(next)
+            } else {
+                markFailed(next.id)
+            }
+
+            PendingDelivery.Group -> Unit
+        }
+    }
+
+    /**
+     * The handshake reached the relay: this is the moment the peer becomes a contact.
+     *
+     * `queued` also lands here. The relay is holding the envelope for an offline peer,
+     * so the request will be attempted when they connect — that is a real, server-side
+     * promise, unlike "the bytes went into the socket".
+     */
+    private fun confirmHandshake(peer: String) {
+        announce(peer)
+    }
+
+    /**
+     * The relay refused the handshake (`offline` in live mode, or an error).
+     *
+     * 现在要把它收回去：会话视图关掉、快照删掉、**联系人里本来就没有他**（这次没写），
+     * 并把原因如实显示出来。以前这个场景会留下一个"看起来加上了"的联系人。
+     */
+    private fun abandonHandshake(peer: String) {
+        store.remove(SESSION_PREFIX + peer)
+        session?.close()
+        session = null
+        peerMailbox = ""
+
+        val message = "对方不在线，添加请求未送达。等对方上线后再试。"
+        update {
+            it.copy(
+                peerIdentityHex = if (it.peerIdentityHex == peer) "" else it.peerIdentityHex,
+                safetyNumber = "",
+                messages = emptyList(),
+                connection = message,
+                error = message,
+            )
+        }
+    }
+
+    /** A message's reply arrived: mark it delivered, and record the preview if this was a new peer. */
+    private fun confirmMessage(delivery: PendingDelivery.Message) {
+        markSent(delivery.id)
+
+        if (contacts.none { it.identityHex == delivery.peer }) {
+            contacts = ContactList.noteMessage(
+                contacts,
+                delivery.peer,
+                delivery.atMillis,
+                delivery.preview,
+                outgoing = true,
+            )
+            publishContacts()
+        }
+    }
+
+    /**
+     * Clears deliveries whose replies can no longer arrive.
+     *
+     * Called when the socket reconnects: a new connection means the old connection's
+     * replies were lost, so anything still waiting will never be settled. Marking them
+     * failed is the honest outcome — the alternative is a bubble stuck on "发送中" forever.
+     */
+    private fun failStaleDeliveries() {
+        if (pendingDeliveries.isEmpty()) return
+
+        val stale = pendingDeliveries.toList()
+        pendingDeliveries.clear()
+
+        for (entry in stale) {
+            when (entry) {
+                is PendingDelivery.Message -> markFailed(entry.id)
+                is PendingDelivery.Handshake -> abandonHandshake(entry.peer)
+                PendingDelivery.Group -> Unit
+            }
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1059,6 +1243,8 @@ class ChatController(
             )
             if (relay?.sendEnvelope(wire) != true) {
                 fail("群邀请未能发出：连接尚未就绪")
+            } else {
+                pendingDeliveries.addLast(PendingDelivery.Group)
             }
         }.onFailure { e -> fail("群邀请发出失败：${e.message}") }
 
