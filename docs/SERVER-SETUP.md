@@ -239,8 +239,10 @@ sudo systemctl edit schat-server
 ```ini
 [Service]
 ExecStart=
-ExecStart=/usr/local/bin/schat-server --config /etc/schat/config.json --state-dir /var/lib/schat $SCHAT_PUBLIC_HOST
+ExecStart=/usr/local/bin/schat-server --listen 0.0.0.0:8443 --config /etc/schat/config.json --state-dir /var/lib/schat $SCHAT_PUBLIC_HOST
 ```
+
+> `--listen` 要显式写 `0.0.0.0:8443`：**只有当监听地址是 `0.0.0.0` 时 `--public-host` 才生效**，否则连接 URI 里会写成 `localhost`，手机配置完之后连的是手机自己（见交接文档 10.6 节）。
 
 ```bash
 sudo systemctl daemon-reload
