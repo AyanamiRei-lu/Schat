@@ -251,6 +251,17 @@ GOWORK=off go list -deps ./... | grep Schat/protocol   # 必须无输出：不�
 
 **已经部署了一台**：阿里云 ECS `ecs.e-c1m2.large`（2 核 4 GiB，Ubuntu 22.04，公网 IP `47.114.40.65`），systemd 方式，实测内存 **2.7 MB**。
 
+> **2026-10-25：该实例已切到 `buffer` 模式**（离线暂存），因为 `live` 模式下"对方离线时发消息/加好友"
+> 永远到不了。实际配置：TTL 72h、单信箱 100 条、全局 128 MiB（配置文件 `/etc/schat/config.json`，
+> `chown root:schat` + `640`——系统服务以 `User=schat` 运行，`600` 会读不到并陷入重启循环）；
+> systemd 用 drop-in 覆盖，**执行命令里必须显式 `--listen 0.0.0.0:8443`**，否则 `--public-host` 不生效。
+> 切换后 `/api/v1/health` 应显示 `"storage":"ram-only"` 与 `retention` 三项；证书指纹**未变**，
+> 已配对的客户端无需重配。
+>
+> ⚠️ **这一步改变了对外承诺的口径**（"不落盘"而非"不存储"），`SECURITY.md`、`README.md`、
+> `SCHAT.md` 已同步；但**隐私政策/儿童规则里"不收集、不存储"的字样尚未改动**——那份是法律文本，
+> 版本号被客户端解析并记录同意，动一个字就要重新同意。**对外提供服务前必须由运营方拍板。**
+
 ### 6.4 跑测试
 
 ```bash
