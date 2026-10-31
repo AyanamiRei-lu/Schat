@@ -92,6 +92,20 @@ class GroupStore(private val store: EncryptedStore) {
     }
 
     /**
+     * 只推进棘轮代数，不重写群状态。
+     *
+     * 单独一个入口而不是 `save(record.copy(generation = n))`：状态 JSON 含该 epoch 的密钥，
+     * 重写它会把一次「记一个数字」变成一次「重写全部密钥材料」的机会。
+     *
+     * 群不存在时拒绝，而不是顺手建一个：只有代数的群是半个记录，读回来仍是 null。
+     */
+    fun saveGeneration(groupIdHex: String, generation: Long) {
+        require(generation >= 0) { "棘轮代数不能为负" }
+        require(store.contains(stateKey(groupIdHex))) { "群状态不存在，不能单独保存代数" }
+        store.putString(generationKey(groupIdHex), generation.toString())
+    }
+
+    /**
      * 读回一个群。
      *
      * 缺少状态或代数时返回 null，而不是半个对象：[stateJson] 缺失意味着这个群已经不可用，

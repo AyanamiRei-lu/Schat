@@ -4,6 +4,7 @@ import com.schat.android.data.store.EncryptedStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -137,5 +138,38 @@ class GroupStoreTest {
         val store = newStore()
         store.save(record(id = "aaaa"))
         assertFalse(store.list().contains("bbbb"))
+    }
+
+    @Test
+    fun `saveGeneration advances the stored position without rewriting the state`() {
+        // The generation is the sender's ratchet position. `sendGroup` used to throw the value
+        // away and keep passing the snapshot's old one, so every message in an epoch claimed
+        // generation zero. The state JSON holds epoch keys; advancing a counter must not rewrite it.
+        val store = newStore()
+        store.save(record(state = "snapshot", generation = 0))
+        store.saveGeneration("67727031", 4)
+
+        val loaded = store.load("67727031")!!
+        assertEquals(4L, loaded.generation)
+        assertEquals("snapshot", loaded.stateJson)
+    }
+
+    @Test
+    fun `saveGeneration refuses a negative position`() {
+        val store = newStore()
+        store.save(record())
+        assertThrows(IllegalArgumentException::class.java) {
+            store.saveGeneration("67727031", -1)
+        }
+    }
+
+    @Test
+    fun `saveGeneration refuses a group that was never saved`() {
+        // A generation without its state is half a record: it would let a caller believe the
+        // group exists while every read still returns null.
+        val store = newStore()
+        assertThrows(IllegalArgumentException::class.java) {
+            store.saveGeneration("missing", 1)
+        }
     }
 }

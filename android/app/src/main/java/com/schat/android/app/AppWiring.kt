@@ -500,10 +500,10 @@ private fun ChatRoute(
             messages = com.schat.android.core.groups.GroupStore(store)
                 .loadMessages(currentGroup.groupIdHex),
             onSend = { text ->
+                // 代数由控制器从存储里读：界面手里那份群记录不会随发送更新。
                 controller.sendGroup(
                     currentGroup.stateJson,
                     text,
-                    currentGroup.generation,
                     currentGroup.groupIdHex,
                 )
             },

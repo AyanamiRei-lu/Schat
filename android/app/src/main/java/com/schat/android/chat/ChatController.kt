@@ -711,10 +711,20 @@ class ChatController(
     /**
      * 群消息发送的第一步：算出该 epoch 的信箱，并加密正文。
      *
-     * 返回 (逗号分隔的信箱, 密文十六进制)。第二步——装 0x03 信封、发出、落库——
+     * 返回信箱、密文与**下一条消息要用的代数**。第二步——装 0x03 信封、发出、落库——
      * 在 [sendGroup] 里。分成两步是为了每一步都小到能在一次编译里验证。
      */
-    fun prepareGroupMessage(groupStateJson: String, text: String, generation: Long): Pair<String, String>? {
+    data class PreparedGroupMessage(
+        val tokensCsv: String,
+        val messageHex: String,
+        val nextGeneration: Long,
+    )
+
+    fun prepareGroupMessage(
+        groupStateJson: String,
+        text: String,
+        generation: Long,
+    ): PreparedGroupMessage? {
         val tokens = try {
             // 信箱由 epoch 导出，所以同 epoch 的成员必然算出同一串——没有任何东西分发它。
             // 令牌 epoch 取自墙上时钟：它的用途是容忍时钟跨过边界，因此必须由这里提供。
@@ -744,7 +754,7 @@ class ChatController(
             return null
         }
 
-        return Pair(tokens, sealed.messageHex)
+        return PreparedGroupMessage(tokens, sealed.messageHex, sealed.nextGeneration)
     }
 
     /**
@@ -753,11 +763,23 @@ class ChatController(
      * 中继看到的是一条消息一个投递令牌，与单聊无异——它不知道群的规模、不知道谁在说话，
      * 也不知道这是一条群消息（信封的内容类型是唯一标志，而中继不读它）。
      */
-    fun sendGroup(groupStateJson: String, text: String, generation: Long, groupIdHex: String) {
-        val prepared = prepareGroupMessage(groupStateJson, text, generation) ?: return
-        val tokensCsv = prepared.first
-        val messageHex = prepared.second
-        val tokens = tokensCsv.split(',').filter { it.isNotEmpty() }
+    fun sendGroup(groupStateJson: String, text: String, groupIdHex: String) {
+        // 代数的唯一来源是存储，不是调用方手里的那份快照。界面把 group 记录 remember 住了，
+        // 它不会随每次发送自动更新；上一版正是因此每一条消息都传同一个代数。
+        val record = groupStore.load(groupIdHex)
+        if (record == null) {
+            fail("群记录不存在，消息未发出")
+            return
+        }
+
+        val prepared = prepareGroupMessage(groupStateJson, text, record.generation) ?: return
+
+        // 加密已经消耗了一代：先把新代数写进存储，再发送。发送失败也不回退——
+        // 用过的代数不能再用，否则同一代密钥会被第二条消息重用（§9.2）。
+        runCatching { groupStore.saveGeneration(groupIdHex, prepared.nextGeneration) }
+            .onFailure { e -> fail("群消息已加密但代数未能保存：${e.message}") }
+
+        val tokens = prepared.tokensCsv.split(',').filter { it.isNotEmpty() }
         if (tokens.isEmpty()) {
             fail("群信箱列表为空，消息未发出")
             return
@@ -766,7 +788,7 @@ class ChatController(
         val envelope = try {
             GroupController.wrap(
                 tokens[0],
-                messageHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray(),
+                prepared.messageHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray(),
             )
         } catch (e: Exception) {
             fail("群信封构造失败：${e.message}")
@@ -795,7 +817,7 @@ class ChatController(
                 com.schat.android.core.groups.GroupMessage(
                     fromLeaf = 0L,
                     mine = true,
-                    generation = generation,
+                    generation = record.generation,
                     atMillis = System.currentTimeMillis(),
                     text = text,
                 ),
