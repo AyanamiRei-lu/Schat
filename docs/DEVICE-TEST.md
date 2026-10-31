@@ -21,9 +21,9 @@
 | 项目 | 值 |
 |---|---|
 | 文件 | `build/schat-0.1.0-alpha-debug.apk`（同 `android/app/build/outputs/apk/debug/app-debug.apk`） |
-| 大小 | 27.14 MB（28,463,200 字节）—— **干净构建**实测（`gradlew clean :app:assembleDebug`） |
-| 构建时间 | 2026-10-25 01:57 |
-| SHA256 | `5134CF25A188D740633BFBD2DD32862EDE7E02160954162C843C79C0AF7BFAC4` |
+| 大小 | 27.15 MB（28,464,948 字节）—— **干净构建**实测（`gradlew clean :app:assembleDebug`） |
+| 构建时间 | 2026-10-31 16:45 |
+| SHA256 | `C8FCA6ACA9416AC56C6551D085CA4EB384C2551FFD62086E25DEB71EEF79A9EE` |
 | 包名 | `com.schat.android` |
 | 版本 | `0.1.0-alpha`（versionCode 1） |
 | minSdk / targetSdk | **26（Android 8.0）/ 37** |
