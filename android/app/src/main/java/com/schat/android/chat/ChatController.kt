@@ -926,6 +926,11 @@ class ChatController(
         profileStore.saveNickname(clean)
         myNickname = clean
         update { it.copy(myNickname = clean) }
+
+        // 改名必须**强制**重发：这条连接上可能已经通告过旧名字，而 `announcedPeers`
+        // 会让普通调用跳过。群通告没有去重，所以只需要处理当前会话这一边。
+        val peer = state.peerIdentityHex
+        if (peer.isNotEmpty()) announcedPeers.remove(peer)
         sendNicknameToActivePeer()
         groupStore.list().forEach { sendGroupNickname(it) }
     }
@@ -1072,10 +1077,23 @@ class ChatController(
     /** 把一条收到的名字写进名字簿与联系人视图，并持久化。 */
     private fun rememberPeerName(identityHex: String, name: String) {
         val identity = identityHex.trim().lowercase()
+
+        // 自己的名字来自 `profile.nickname`，不是从信封里学来的。收到自己的群通告时
+        // （发送方也订阅群信箱）不能让它覆盖本机设置。
+        if (identity == myIdentityHex.lowercase()) return
+
         peerNames = com.schat.android.core.names.PeerNames.put(peerNames, identity, name)
-        peerNameStore.remember(identity, name)
+
+        // 先更新内存视图，再落盘：写失败时用户至少能看到名字，而错误也被如实说出来，
+        // 而不是让一次存储异常把收包线程的任务整个打断。
         contacts = ContactList.withPeerNames(contacts, peerNames)
         publishContacts()
+
+        try {
+            peerNameStore.remember(identity, name)
+        } catch (e: Exception) {
+            fail("昵称已收到但未能保存：${e.message}")
+        }
     }
 
 
