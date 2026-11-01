@@ -52,4 +52,12 @@ class NicknamePayloadTest {
             NicknamePayload.decode(NicknamePayload.encode(long))?.length,
         )
     }
+
+    @Test
+    fun `a nickname at the character limit is not rejected by our own wire bound`() {
+        // 64 个三字节字符 -> 192 字节 UTF-8 -> base64 256 字符，再加 magic 行 13 字节 = 269。
+        // 上限若还是 256，编码能产出、解码会拒绝——自己拒绝自己。
+        val longest = "阿".repeat(com.schat.android.core.contacts.ContactCodec.MAX_NICKNAME_LENGTH)
+        assertEquals(longest, NicknamePayload.decode(NicknamePayload.encode(longest)))
+    }
 }

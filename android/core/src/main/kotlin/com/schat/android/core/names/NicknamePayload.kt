@@ -27,8 +27,14 @@ object NicknamePayload {
 
     const val MAGIC = "SCHAT-NICK-1"
 
-    /** 整段载荷的上限。昵称本身受 [ContactCodec.MAX_NICKNAME_LENGTH] 约束，远小于它。 */
-    const val MAX_WIRE_BYTES = 256
+    /**
+     * 整段载荷的上限。
+     *
+     * 推导：昵称上限 64 个 UTF-16 单元，最坏是每个单元 3 字节的 UTF-8（192 字节），
+     * base64 后 256 字符，加上 `SCHAT-NICK-1\n` 的 13 字节 = 269。取 320 留余量。
+     * 写成 256 会让解码拒绝自己刚编码出来的合法昵称。
+     */
+    const val MAX_WIRE_BYTES = 320
 
     /** 编码。清洗规则与联系人备注一致——它是同一个用户在同一个输入框里会打的东西。 */
     fun encode(raw: String): ByteArray {
