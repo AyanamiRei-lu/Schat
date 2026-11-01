@@ -483,7 +483,7 @@ func retentionPolicy(cfg config.Config) map[string]any {
 		"ttl_seconds":               int64(cfg.Buffer.TTL.Seconds()),
 		"max_envelopes_per_mailbox": cfg.Buffer.MaxPerToken,
 		"max_bytes":                 cfg.Buffer.MaxGlobalMemory,
-		"note": "ciphertext envelopes are held in RAM only and are lost on restart",
+		"note":                      "ciphertext envelopes are held in RAM only and are lost on restart",
 	}
 }
 
@@ -498,10 +498,10 @@ func healthHandler(cfg config.Config, c *metrics.Counters, gw *gateway.Gateway, 
 		snap := c.Snapshot()
 		identities, prekeys, _ := keys.Stats()
 		writeJSON(w, map[string]any{
-			"status":           "ok",
-			"version":          version.Version,
-			"protocol":         version.Protocol,
-			"mode":             cfg.Mode,
+			"status":   "ok",
+			"version":  version.Version,
+			"protocol": version.Protocol,
+			"mode":     cfg.Mode,
 			// "none" used to be hardcoded here, which meant the health endpoint kept
 			// claiming the relay stores nothing even after buffer mode was switched on.
 			// That is exactly the kind of lie this project forbids in its own docs.

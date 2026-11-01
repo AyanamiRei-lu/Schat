@@ -145,7 +145,16 @@ Invoke-Checked 'server has no third-party dependencies' {
     try {
         $mods = & go list -m all
         if ($LASTEXITCODE -ne 0) { throw "go list -m all failed" }
-        $external = $mods | Where-Object { $_ -notmatch '^github\.com/schat/schat/server' }
+        # Compare against the module name written in go.mod. The module was renamed in
+        # 2026-09 (github.com/schat/schat/server -> github.com/AyanamiRei-lu/Schat/server),
+        # and a hardcoded pattern made this check permanently red -- a check that is always
+        # red is a check nobody reads.
+        # ASCII only in this file: Windows PowerShell 5.1 reads BOM-less scripts as ANSI,
+        # and non-ASCII comments have broken parsing here before.
+        $moduleLine = Select-String -Path 'go.mod' -Pattern '^module\s+(\S+)' | Select-Object -First 1
+        if (-not $moduleLine) { throw 'server/go.mod has no module line' }
+        $moduleName = $moduleLine.Matches[0].Groups[1].Value
+        $external = $mods | Where-Object { ($_.Trim() -split '\s+')[0] -ne $moduleName }
         if ($external) {
             Write-Host ($external -join "`n")
             throw 'the server gained a dependency; server/go.mod documents why it must not'
@@ -201,8 +210,17 @@ Invoke-Checked 'server smoke test (TLS + gateway)' {
         if ($health -notmatch 'HTTPSTATUS:200') {
             throw "health over TLS did not return 200: $health"
         }
-        if ($health -notmatch '"storage"\s*:\s*"none"') {
-            throw 'the server did not report zero storage'
+        # The smoke test starts the server with --mode buffer, so the honest value is
+        # "ram-only": buffer keeps envelopes in memory, bounded by TTL and count. "none"
+        # is what live mode reports. The old assertion hardcoded "none" and would fail
+        # forever once buffer became the production configuration.
+        if ($health -notmatch '"storage"\s*:\s*"ram-only"') {
+            throw 'the server did not report RAM-only storage in buffer mode'
+        }
+        # The property that actually matters is "never on disk", and retention.on_disk
+        # is what answers it.
+        if ($health -notmatch '"on_disk"\s*:\s*false') {
+            throw 'the server reported disk storage, which buffer mode must never use'
         }
         # A pinned self-signed certificate is only usable if the fingerprint is
         # published, so its presence is part of the contract.
