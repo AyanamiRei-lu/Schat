@@ -36,6 +36,14 @@ data class ProfileBackup(
 
     /** Locally remembered peers. */
     val contacts: List<Contact> = emptyList(),
+
+    /**
+     * 这台设备的用户给自己起的昵称。空串表示从未设置。
+     *
+     * 它随备份走：换机之后别人看到的名字不该悄悄变回一串十六进制。对方的昵称不在备份
+     * 里——那些会随下一次会话通告重新学到，而把它们存进备份只会带来过期的名字。
+     */
+    val nickname: String = "",
 )
 
 /**
@@ -57,6 +65,7 @@ data class ProfileBackup(
  * recovery=<base64>
  * server=<base64>
  * contacts=<base64 of a ContactCodec document>
+ * name=<base64>
  * ```
  */
 object ProfileBackupCodec {
@@ -70,6 +79,8 @@ object ProfileBackupCodec {
         append("recovery=").append(enc(backup.recoveryCode)).append('\n')
         append("server=").append(enc(backup.serverUri)).append('\n')
         append("contacts=").append(enc(ContactCodec.encode(backup.contacts))).append('\n')
+        // 总是写这一行（空串也写）：格式稳定，读的一侧不需要分辨「没有这一行」和「空」。
+        append("name=").append(enc(backup.nickname)).append('\n')
     }
 
     /**
@@ -97,6 +108,10 @@ object ProfileBackupCodec {
         val server = fields["server"]?.let(::dec) ?: return null
         val contactsText = fields["contacts"]?.let(::dec) ?: return null
 
+        // 旧备份没有这一行。缺失视为「未设置」，而不是拒绝整份备份——那会让换机的人
+        // 丢掉身份，只为了一个名字。
+        val nickname = fields["name"]?.let(::dec) ?: ""
+
         if (identity.isBlank() || server.isBlank()) return null
 
         return ProfileBackup(
@@ -105,6 +120,7 @@ object ProfileBackupCodec {
             recoveryCode = recovery,
             serverUri = server,
             contacts = ContactCodec.decode(contactsText),
+            nickname = nickname,
         )
     }
 

@@ -82,6 +82,19 @@ class ClientProfileStore(private val store: EncryptedStore) {
     /** Removes every record belonging to the profile. */
     fun clear() {
         REQUIRED.forEach { store.remove(it) }
+        store.remove(KEY_NICKNAME)
+    }
+
+    /**
+     * 本机用户给自己起的名字；空串表示未设置。
+     *
+     * 它**不在** [REQUIRED] 里：这一项是后来加的，旧档案没有它仍然是一份完整档案。
+     */
+    fun loadNickname(): String = store.getString(KEY_NICKNAME).orEmpty()
+
+    /** 保存自己的昵称；空串表示清除。 */
+    fun saveNickname(value: String) {
+        if (value.isEmpty()) store.remove(KEY_NICKNAME) else store.putString(KEY_NICKNAME, value)
     }
 
     private companion object {
@@ -90,6 +103,7 @@ class ClientProfileStore(private val store: EncryptedStore) {
         const val KEY_ROUTE_KEY = "profile.routeKey"
         const val KEY_RECOVERY = "profile.recovery"
         const val KEY_SERVER = "profile.server"
+        const val KEY_NICKNAME = "profile.nickname"
 
         val REQUIRED = listOf(KEY_IDENTITY, KEY_PREKEYS, KEY_ROUTE_KEY, KEY_RECOVERY, KEY_SERVER)
     }

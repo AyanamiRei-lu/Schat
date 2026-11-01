@@ -89,4 +89,24 @@ class ProfileBackupCodecTest {
         assertEquals(emptyList<Contact>(), restored!!.contacts)
         assertEquals(sample.identityJson, restored.identityJson)
     }
+
+    @Test
+    fun `a backup written before nicknames existed still decodes`() {
+        // 旧备份没有 name= 这一行。拒绝它等于让用户换机时丢掉整个身份。
+        val withoutName = ProfileBackupCodec.encode(sample)
+            .split('\n')
+            .filterNot { it.startsWith("name=") }
+            .joinToString("\n")
+
+        val restored = ProfileBackupCodec.decode(withoutName)
+
+        assertEquals("", restored!!.nickname)
+        assertEquals(sample.identityJson, restored.identityJson)
+    }
+
+    @Test
+    fun `a nickname survives the backup round trip`() {
+        val named = sample.copy(nickname = "阿狸")
+        assertEquals(named, ProfileBackupCodec.decode(ProfileBackupCodec.encode(named)))
+    }
 }

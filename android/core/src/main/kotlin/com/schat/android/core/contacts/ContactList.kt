@@ -76,6 +76,19 @@ object ContactList {
     }
 
     /**
+     * Fills in the peer's self-declared names from the name book.
+     *
+     * [Contact.peerName] is derived; the contact record on disk does not carry it. Every load
+     * and every received name therefore goes through here, and an identity the book no longer
+     * knows is cleared rather than left with a stale label.
+     */
+    fun withPeerNames(contacts: List<Contact>, names: Map<String, String>): List<Contact> =
+        contacts.map { contact ->
+            val name = names[contact.identityHex].orEmpty()
+            if (contact.peerName == name) contact else contact.copy(peerName = name)
+        }
+
+    /**
      * Sets the nickname for a contact, sanitising it. An empty nickname clears it.
      *
      * Naming an identity that is not in the list CREATES the record rather than doing

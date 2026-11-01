@@ -136,6 +136,41 @@ class ContactCodecTest {
         assertTrue(named.isNamed)
         assertEquals("Bob", named.displayName)
     }
+
+    @Test
+    fun `display prefers the remark, then the peer name, then the key`() {
+        val plain = Contact(identityHex = a)
+        assertEquals("aaaaaaaa…aaaaaaaa", plain.displayName)
+
+        // 对方自报的名字比缩写有用，但它仍然只是标签。
+        assertEquals("阿狸", plain.copy(peerName = "阿狸").displayName)
+
+        // 你给他起的备注盖过他自己起的名字：这是本机唯一能压过对方的显示决定。
+        assertEquals(
+            "老张",
+            plain.copy(nickname = "老张", peerName = "阿狸").displayName,
+        )
+    }
+
+    @Test
+    fun `a seven field record from an older build still decodes`() {
+        // v0.1.0-alpha 写出的联系人是 7 段；新增的 peerName 是派生字段，不占位。
+        val legacy = "$a\tQQ==\t1\t2\t0\t0\tQQ=="
+        val decoded = ContactCodec.decode("${ContactCodec.MAGIC}\n$legacy")
+
+        assertEquals(1, decoded.size)
+        assertEquals(a, decoded[0].identityHex)
+        assertEquals("A", decoded[0].nickname)
+        assertEquals("", decoded[0].peerName)
+    }
+
+    @Test
+    fun `the peer name is a view field and is not written to disk`() {
+        val encoded = ContactCodec.encode(listOf(sample().copy(peerName = "阿狸")))
+
+        assertEquals(7, encoded.lines()[1].split('\t').size)
+        assertEquals("", ContactCodec.decode(encoded)[0].peerName)
+    }
 }
 
 class ContactListTest {

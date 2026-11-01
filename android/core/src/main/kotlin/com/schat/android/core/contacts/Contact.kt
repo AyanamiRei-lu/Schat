@@ -12,14 +12,13 @@ import java.util.Base64
  * anywhere in the protocol, because a server that can list who exists on it — and who
  * talks to whom — would be a metadata store that this design exists to avoid.
  *
- * # Why the nickname is local only
+ * # Two names, and why they are separate
  *
- * [nickname] is what *this* user calls the peer. Nothing in the protocol carries it, so it
- * cannot be used to impersonate anyone, and no peer can rename itself in someone else's
- * list. A self-declared display name would need a new encrypted content type, and it would
- * have to be shown as "what they call themselves" rather than as a name, precisely because
- * anyone can claim any name. That is a deliberate omission rather than an oversight, and
- * it can be added later as a pure addition without changing this record's meaning.
+ * [nickname] is what *this* user calls the peer. It never leaves this device, so no peer can
+ * rename itself in someone else's list. [peerName] is what the peer calls itself, received
+ * over an encrypted channel: a label anyone can claim, shown as their claim rather than as a
+ * fact. The local remark wins, because that is the one decision the peer cannot make for the
+ * user. Identity is still the 60-digit safety number, compared out of band.
  *
  * # What a nickname is not
  *
@@ -48,10 +47,23 @@ data class Contact(
 
     /** Messages received since the conversation was last opened. */
     val unread: Int = 0,
+
+    /**
+     * The name the peer gave themselves, as received over an encrypted channel.
+     *
+     * **Derived, and never written to disk by [ContactCodec].** It is filled in from the name
+     * book (`com.schat.android.core.names.PeerNameStore`) when contacts are loaded, so the
+     * stored record keeps meaning exactly what it meant before nicknames existed.
+     *
+     * It is a label, not an identity: anyone can claim any name. [nickname] — what this user
+     * chose to call the peer — always wins, because that is the one decision the peer cannot
+     * make for them.
+     */
+    val peerName: String = "",
 ) {
-    /** What the list shows: the chosen nickname, or an abbreviation of the key. */
+    /** What the list shows: the remark, then the peer's own name, then an abbreviation. */
     val displayName: String
-        get() = nickname.ifBlank { abbreviate(identityHex) }
+        get() = nickname.ifBlank { peerName.ifBlank { abbreviate(identityHex) } }
 
     /**
      * Whether this contact has been named by the user.
