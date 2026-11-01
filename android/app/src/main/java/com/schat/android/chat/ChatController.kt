@@ -56,6 +56,21 @@ data class ChatState(
      */
     val contacts: List<com.schat.android.core.contacts.Contact> = emptyList(),
 
+    /**
+     * 这台设备的用户给自己起的昵称；空串表示未设置。
+     *
+     * 它是**自报名**，别人看到的名字。与联系人里的备注不同：备注只在本机，且优先于它。
+     */
+    val myNickname: String = "",
+
+    /**
+     * 身份 → 对方自报的昵称。
+     *
+     * 按身份索引而不是按群里的叶子下标：下标每次成员变更都会变。群成员可能不在联系人
+     * 里（别人拉进来的），所以它必须独立于联系人存在。
+     */
+    val peerNames: Map<String, String> = emptyMap(),
+
     /** Set when the last operation failed, for display. */
     val error: String? = null,
 
@@ -107,6 +122,22 @@ class ChatController(
     // 群状态与单聊状态存在同一个加密库里，用同一个密钥保护。
     // 全限定名是有意的：它让这次改动不必碰 import 区，而 import 区是我没有读过的部分。
     private val groupStore = com.schat.android.core.groups.GroupStore(store)
+
+    /** 身份 → 对方自报的昵称。群成员可能不在联系人里，所以它独立存在。 */
+    private val peerNameStore = com.schat.android.core.names.PeerNameStore(store)
+
+    private var peerNames: Map<String, String> = emptyMap()
+
+    /** 这台设备的用户给自己起的昵称；空串表示未设置。 */
+    private var myNickname: String = ""
+
+    /**
+     * 本连接已经向哪些对端通告过昵称。
+     *
+     * 每条连接一次就够了：通告是幂等的标签，不是消息。重连后清空，因为上一次连接上
+     * 发出的信封可能根本没到（`live` 模式下对方离线时会被丢弃）。
+     */
+    private val announcedPeers = mutableSetOf<String>()
 
     /** Serialises everything that touches the session or the network. */
     private val worker: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
@@ -190,6 +221,14 @@ class ChatController(
 
         /** 群消息 / 群提交 / 群邀请：只占一个位置，让后面的回执不会错位。 */
         data object Group : PendingDelivery
+
+        /**
+         * 一封昵称通告（单聊或群）。
+         *
+         * 它**必须**占位，否则它的回执会被配给前面某条聊天消息，把一条其实没送达的消息
+         * 标成「已送达服务器」——那正是这条队列存在时要消灭的谎话。它自己不结算任何东西。
+         */
+        data object Profile : PendingDelivery
     }
 
     /** Set once the heartbeat timer is scheduled, so reconnects do not stack timers. */
@@ -218,6 +257,10 @@ class ChatController(
 
         // Contacts first: reopening a conversation marks it read, which needs the list.
         loadContacts()
+
+        // 昵称在载入时再清洗一次：存储是加密的，但它同样是输入，而清洗是幂等的。
+        myNickname = ContactCodec.sanitiseNickname(profileStore.loadNickname())
+        update { it.copy(myNickname = myNickname) }
 
         // Reopen the last conversation BEFORE connecting, so the message history is on
         // screen immediately rather than appearing only after the network settles. The
@@ -363,6 +406,10 @@ class ChatController(
         if (relay?.sendEnvelope(wire) == true) {
             pendingDeliveries.addLast(PendingDelivery.Handshake(peer))
 
+            // 握手在前、昵称在后：对方要先接受 Init 才有会话可解密。同一条信箱、同一个
+            // 连接，顺序由 WebSocket 保证。
+            sendNickname(peer)
+
             if (known) {
                 // 已经是联系人：正常打开这段会话，等回执回来只更新状态。
                 reopenConversation(peer)
@@ -472,6 +519,13 @@ class ChatController(
             // a non-event.
             publishBundle()
 
+            // 每条连接重置一次「已通告」：上一次连接上发出的信封可能根本没到（live 模式
+            // 下对端离线即丢弃）。连接建立是补发昵称最便宜、也最可靠的一次机会。
+            announcedPeers.clear()
+            val peer = state.peerIdentityHex
+            if (peer.isNotEmpty() && session != null) sendNickname(peer)
+            groupStore.list().forEach { sendGroupNickname(it) }
+
             // Scheduled once. Re-registering on every reconnect would stack up timers
             // and send an ever-growing number of heartbeats.
             if (!heartbeatStarted) {
@@ -490,6 +544,7 @@ class ChatController(
         override fun onControl(json: String) = onWorker { handleControl(json) }
 
         override fun onDisconnected(code: Int, reason: String) = onWorker {
+            announcedPeers.clear()
             update { it.copy(connection = "连接已断开（$code）") }
             scheduleReconnect()
         }
@@ -529,6 +584,8 @@ class ChatController(
             CONTENT_TYPE_GROUP -> receiveGroupMessage(envelope)
             CONTENT_TYPE_GROUP_WELCOME -> acceptGroupWelcome(envelope)
             CONTENT_TYPE_GROUP_COMMIT -> receiveGroupCommit(envelope)
+            CONTENT_TYPE_PROFILE -> receiveNickname(envelope)
+            CONTENT_TYPE_GROUP_PROFILE -> receiveGroupNickname(envelope)
             else -> fail("收到了未知的内容类型 $kind")
         }
     }
@@ -668,9 +725,17 @@ class ChatController(
             return
         }
 
-        runCatching {
+        val saved = runCatching {
             groupStore.save(record.copy(stateJson = next, generation = 0L))
-        }.onFailure { e -> fail("群变更已应用但未能保存：${e.message}") }
+        }
+        if (saved.isFailure) {
+            fail("群变更已应用但未能保存：${saved.exceptionOrNull()?.message}")
+            return
+        }
+
+        // 有人改了群：新成员可能还不知道本机叫什么，重发一次自己的名字。成员表里没变时
+        // 这封通告是幂等的，代价是一个很小的信封。
+        sendGroupNickname(record.groupIdHex)
     }
 
     private fun acceptGroupWelcome(envelope: ByteArray) {
@@ -700,12 +765,21 @@ class ChatController(
             return
         }
 
-        runCatching {
+        val joined = runCatching {
             val summary = GroupController.summary(state)
             groupStore.save(
                 com.schat.android.core.groups.GroupRecord(summary.groupIDHex, state, 0L),
             )
-        }.onFailure { e -> fail("已入群但未能保存：${e.message}") }
+            summary.groupIDHex
+        }
+        if (joined.isFailure) {
+            fail("已入群但未能保存：${joined.exceptionOrNull()?.message}")
+            return
+        }
+
+        // 刚进群：把自己的名字发到群里，让已有成员知道新来的是谁。他们与本机可能从无
+        // 一对一会话，这条群信封是唯一能把名字带过去的通道。
+        sendGroupNickname(joined.getOrThrow())
     }
 
     /**
@@ -725,22 +799,7 @@ class ChatController(
         text: String,
         generation: Long,
     ): PreparedGroupMessage? {
-        val tokens = try {
-            // 信箱由 epoch 导出，所以同 epoch 的成员必然算出同一串——没有任何东西分发它。
-            // 令牌 epoch 取自墙上时钟：它的用途是容忍时钟跨过边界，因此必须由这里提供。
-            mobile.Mobile.groupMailboxTokens(
-                groupStateJson,
-                mobile.Mobile.currentEpoch(System.currentTimeMillis() / 1000L),
-                3L,
-            )
-        } catch (e: Exception) {
-            fail("无法派生群信箱：${e.message}")
-            return null
-        }
-        if (tokens.isEmpty()) {
-            fail("群路由密钥没有派生出任何信箱")
-            return null
-        }
+        val tokens = groupMailboxes(groupStateJson) ?: return null
 
         val sealed = try {
             GroupController.seal(
@@ -754,7 +813,34 @@ class ChatController(
             return null
         }
 
-        return PreparedGroupMessage(tokens, sealed.messageHex, sealed.nextGeneration)
+        return PreparedGroupMessage(tokens.joinToString(","), sealed.messageHex, sealed.nextGeneration)
+    }
+
+    /**
+     * 这个 epoch 的群信箱。
+     *
+     * [quiet] 用于昵称通告：它会在连接建立时对每个群自动发一次，那里的失败不该弹到
+     * 用户面前（群可能刚好在处理一条提交、状态暂时不可用，下一次连接会重试）。
+     */
+    private fun groupMailboxes(groupStateJson: String, quiet: Boolean = false): List<String>? {
+        val tokensCsv = try {
+            // 信箱由 epoch 导出，所以同 epoch 的成员必然算出同一串——没有任何东西分发它。
+            // 令牌 epoch 取自墙上时钟：它的用途是容忍时钟跨过边界，因此必须由这里提供。
+            mobile.Mobile.groupMailboxTokens(
+                groupStateJson,
+                mobile.Mobile.currentEpoch(System.currentTimeMillis() / 1000L),
+                GROUP_MAILBOX_TOKENS,
+            )
+        } catch (e: Exception) {
+            if (!quiet) fail("无法派生群信箱：${e.message}")
+            return null
+        }
+        val tokens = tokensCsv.split(',').filter { it.isNotEmpty() }
+        if (tokens.isEmpty()) {
+            if (!quiet) fail("群路由密钥没有派生出任何信箱")
+            return null
+        }
+        return tokens
     }
 
     /**
@@ -823,6 +909,173 @@ class ChatController(
                 ),
             )
         }.onFailure { e -> fail("群消息已发出但未能保存：${e.message}") }
+    }
+
+    // ------------------------------------------------------------------
+    // Nickname (self-declared name)
+
+    /**
+     * 设置 / 修改 / 清除自己的昵称。
+     *
+     * 空串表示清除。保存后立刻对**当前会话的对端**与**所有群**通告一次；其余联系人在你
+     * 下次打开与他的会话时同步——本机一次只持有一段活动会话（见 [receiveNickname]），
+     * 这是 v1 的边界，不是遗漏。
+     */
+    fun setMyNickname(raw: String) = onWorker {
+        val clean = ContactCodec.sanitiseNickname(raw)
+        profileStore.saveNickname(clean)
+        myNickname = clean
+        update { it.copy(myNickname = clean) }
+        sendNicknameToActivePeer()
+        groupStore.list().forEach { sendGroupNickname(it) }
+    }
+
+    /** 本机用户给自己起的名字；空串表示未设置。 */
+    fun myNickname(): String = myNickname
+
+    private fun sendNicknameToActivePeer() {
+        val peer = state.peerIdentityHex
+        if (peer.isEmpty() || session == null || peer in announcedPeers) return
+        sendNickname(peer)
+    }
+
+    /**
+     * 把本机昵称发给一个已有会话的对端。
+     *
+     * 顺序是硬性的：加密 → 落盘 → 发送。加密推进了发送链，不先落盘就重启会让链密钥被
+     * 重用；落盘之后即使发送失败也不能回滚——那一代已经用掉了。
+     */
+    private fun sendNickname(peer: String) {
+        val active = session ?: return
+        if (peer.isEmpty() || peerMailbox.isEmpty()) return
+
+        val wire = try {
+            active.encryptProfile(
+                peerMailbox,
+                com.schat.android.core.names.NicknamePayload.encode(myNickname),
+            )
+        } catch (e: Exception) {
+            return
+        }
+        persistSession(peer)
+        announcedPeers.add(peer)
+        if (relay?.sendEnvelope(wire) == true) {
+            pendingDeliveries.addLast(PendingDelivery.Profile)
+        }
+    }
+
+    /**
+     * 把本机昵称发到某个群的信箱。
+     *
+     * 一次加人之后，同一个群里的新成员可能与本机从无一对一会话；只有群本身能把名字带过去。
+     * 每发一次消耗一代发送密钥，所以先落盘代数、再发送。
+     */
+    private fun sendGroupNickname(groupIdHex: String) {
+        val record = groupStore.load(groupIdHex) ?: return
+        val tokens = groupMailboxes(record.stateJson, quiet = true) ?: return
+
+        val sealed = try {
+            GroupController.seal(
+                record.stateJson,
+                profile.identityJson,
+                com.schat.android.core.names.NicknamePayload.encode(myNickname)
+                    .joinToString("") { "%02x".format(it) },
+                record.generation,
+            )
+        } catch (e: Exception) {
+            return
+        }
+
+        val saved = runCatching { groupStore.saveGeneration(groupIdHex, sealed.nextGeneration) }
+        if (saved.isFailure) return
+
+        val wire = try {
+            mobile.Mobile.wrapGroupProfile(
+                tokens[0],
+                sealed.messageHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray(),
+            )
+        } catch (e: Exception) {
+            return
+        }
+
+        val client = relay ?: return
+        client.subscribe(tokens)
+        if (client.sendEnvelope(wire)) {
+            pendingDeliveries.addLast(PendingDelivery.Profile)
+        }
+    }
+
+    /**
+     * 收到一条单聊昵称通告。
+     *
+     * 解不开、版本不认识都**静默丢弃**：它可能是更新版本的载荷，也可能与当前会话无关。
+     * 昵称不是消息，失败不该在界面上占一行错误。
+     */
+    private fun receiveNickname(envelope: ByteArray) {
+        val active = session ?: return
+        val peer = state.peerIdentityHex
+        if (peer.isEmpty()) return
+
+        val plain = try {
+            active.decryptProfile(envelope)
+        } catch (e: Exception) {
+            return
+        }
+        val name = com.schat.android.core.names.NicknamePayload.decode(plain) ?: return
+        rememberPeerName(peer, name)
+        persistSession(peer)
+    }
+
+    /**
+     * 收到一条群昵称通告。
+     *
+     * 身份由 MLS 的 sender leaf 经当前群状态映射得到，而不是让对方在载荷里自报——
+     * 前者是 epoch 认证过的，后者是一句自称。
+     */
+    private fun receiveGroupNickname(envelope: ByteArray) {
+        val message = try {
+            mobile.Mobile.unwrapGroupProfile(envelope)
+        } catch (e: Exception) {
+            return
+        }
+
+        val messageHex = message.joinToString("") { "%02x".format(it) }
+        val header = try {
+            GroupController.header(messageHex)
+        } catch (e: Exception) {
+            return
+        }
+        val record = groupStore.load(header.groupIDHex) ?: return
+
+        val opened = try {
+            GroupController.open(record.stateJson, messageHex)
+        } catch (e: Exception) {
+            // 旧 epoch、还没应用的提交、或不是这个群的——下次连接会重发。
+            return
+        }
+
+        val name = com.schat.android.core.names.NicknamePayload.decode(
+            opened.plaintextHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray(),
+        ) ?: return
+
+        val identity = try {
+            GroupController.members(record.stateJson)
+                .firstOrNull { it.leaf == opened.senderLeaf }
+                ?.identityHex
+        } catch (e: Exception) {
+            null
+        } ?: return
+
+        rememberPeerName(identity, name)
+    }
+
+    /** 把一条收到的名字写进名字簿与联系人视图，并持久化。 */
+    private fun rememberPeerName(identityHex: String, name: String) {
+        val identity = identityHex.trim().lowercase()
+        peerNames = com.schat.android.core.names.PeerNames.put(peerNames, identity, name)
+        peerNameStore.remember(identity, name)
+        contacts = ContactList.withPeerNames(contacts, peerNames)
+        publishContacts()
     }
 
 
@@ -924,6 +1177,8 @@ class ChatController(
         peerMailbox = mobile.Mobile.mailboxToken(peer)
         persistSession(peer)
         announce(peer)
+        // 对方此刻有会话可解密（我们刚接受了他的 Init），所以这里发一次自己的名字。
+        sendNickname(peer)
         update { it.copy(connection = "会话已建立") }
     }
 
@@ -1026,6 +1281,7 @@ class ChatController(
             }
 
             PendingDelivery.Group -> Unit
+            PendingDelivery.Profile -> Unit
         }
     }
 
@@ -1098,6 +1354,7 @@ class ChatController(
                 is PendingDelivery.Message -> markFailed(entry.id)
                 is PendingDelivery.Handshake -> abandonHandshake(entry.peer)
                 PendingDelivery.Group -> Unit
+                PendingDelivery.Profile -> Unit
             }
         }
     }
@@ -1382,6 +1639,7 @@ class ChatController(
     fun restoreFromBackup(
         restored: ClientProfileData,
         restoredContacts: List<Contact>,
+        restoredNickname: String = "",
         onDone: (Throwable?) -> Unit = {},
     ) = onWorker {
         try {
@@ -1401,7 +1659,14 @@ class ChatController(
             profileStore.save(restored)
             profile = restored
 
-            contacts = restoredContacts.take(ContactCodec.MAX_CONTACTS)
+            // 昵称跟着备份走：换机之后别人看到的名字不该悄悄变回一串十六进制。
+            myNickname = ContactCodec.sanitiseNickname(restoredNickname)
+            profileStore.saveNickname(myNickname)
+
+            contacts = ContactList.withPeerNames(
+                restoredContacts.take(ContactCodec.MAX_CONTACTS),
+                peerNames,
+            )
             publishContacts()
             store.putString(CONTACTS, ContactCodec.encode(contacts))
 
@@ -1411,6 +1676,7 @@ class ChatController(
                     safetyNumber = "",
                     messages = emptyList(),
                     contacts = contacts,
+                    myNickname = myNickname,
                     connection = "已从备份恢复",
                     error = null,
                 )
@@ -1447,6 +1713,9 @@ class ChatController(
         val restored = restoreSnapshot(normalised)
         rememberPeer(normalised)
         store.putString(LAST_PEER, normalised)
+
+        // 打开会话是「其余联系人下次打开时同步」的那个时机。
+        if (restored) sendNickname(normalised)
 
         // Opening a conversation is what clears its badge.
         contacts = ContactList.markRead(contacts, normalised)
@@ -1488,13 +1757,22 @@ class ChatController(
     /** Saves the contact list and mirrors it into the state the UI renders. */
     private fun publishContacts() {
         store.putString(CONTACTS, ContactCodec.encode(contacts))
-        update { it.copy(contacts = contacts) }
+        update { it.copy(contacts = contacts, peerNames = peerNames) }
     }
 
-    /** Loads the contact list from the vault. Called once, on the worker. */
+    /**
+     * Loads the contact list and the name book from the vault. Called once, on the worker.
+     *
+     * The name book is applied as a **derived** field on the contacts, so `Contact.displayName`
+     * keeps its single meaning (remark first) and the stored record is unchanged.
+     */
     private fun loadContacts() {
-        contacts = ContactCodec.decode(store.getString(CONTACTS).orEmpty())
-        update { it.copy(contacts = contacts) }
+        peerNames = peerNameStore.load()
+        contacts = ContactList.withPeerNames(
+            ContactCodec.decode(store.getString(CONTACTS).orEmpty()),
+            peerNames,
+        )
+        publishContacts()
     }
 
     // ------------------------------------------------------------------
@@ -1608,6 +1886,15 @@ class ChatController(
          * single identity because the joiner is not a member yet and cannot derive them.
          */
         const val CONTENT_TYPE_GROUP_COMMIT: Byte = 0x05
+
+        /**
+         * 昵称通告（单聊 / 群）。
+         *
+         * 与聊天帧分开类型，因为接收方必须先知道「这是什么」再决定怎么处理：一条昵称
+         * 被追加进消息列表，就是一条对方从未发过的消息。
+         */
+        const val CONTENT_TYPE_PROFILE: Byte = 0x06
+        const val CONTENT_TYPE_GROUP_PROFILE: Byte = 0x07
 
         /** 与 prepareGroupMessage 用的同一个数量：两边算出的信箱必须逐字相同。 */
         const val GROUP_MAILBOX_TOKENS = 3L

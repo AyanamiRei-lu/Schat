@@ -14,9 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,12 +49,15 @@ import com.schat.android.ui.ui.SectionLabel
 @Composable
 fun MineTab(
     myIdentity: String,
+    nickname: String,
+    onSetNickname: (String) -> Unit,
     serverDisplay: String,
     serverUri: String,
     onOpenRecovery: () -> Unit,
 ) {
     var showIdentityQr by remember { mutableStateOf(false) }
     var showServerQr by remember { mutableStateOf(false) }
+    var showNickname by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         ScreenHeader(title = "我的")
@@ -69,14 +75,16 @@ fun MineTab(
                 horizontalArrangement = Arrangement.spacedBy(Dimens.Md),
             ) {
                 GradientAvatar(
-                    label = "S",
+                    label = nickname.ifBlank { "S" },
                     hue = hueOf(myIdentity),
                     size = 56.dp,
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = "SCHAT 身份",
+                        text = nickname.ifBlank { "SCHAT 身份" },
                         style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = if (myIdentity.isEmpty()) "身份不可用" else abbreviate(myIdentity),
@@ -91,6 +99,12 @@ fun MineTab(
             SectionLabel("我的")
 
             MineGroup {
+                MineRow(
+                    label = "昵称",
+                    value = nickname.ifBlank { "未设置" },
+                    onClick = { showNickname = true },
+                )
+                MineDivider()
                 MineRow(label = "我的二维码", onClick = { showIdentityQr = true })
                 MineDivider()
                 MineRow(label = "服务器连接码", onClick = { showServerQr = true })
@@ -135,6 +149,59 @@ fun MineTab(
             onDismiss = { showServerQr = false },
         )
     }
+
+    if (showNickname) {
+        NicknameDialog(
+            current = nickname,
+            onConfirm = {
+                onSetNickname(it)
+                showNickname = false
+            },
+            onDismiss = { showNickname = false },
+        )
+    }
+}
+
+/**
+ * 设置昵称。
+ *
+ * 它是**自报名**：别人会看到，任何人都可以自称任何名字。所以文案里不写「你的名字」，
+ * 而写「别人会看到这个名字」，并把唯一能确认身份的办法（安全码）同一句说清楚。
+ */
+@Composable
+private fun NicknameDialog(
+    current: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf(current) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("设置昵称") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("昵称") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = "别人会看到这个名字。任何人都可以自称任何名字，确认身份请比对安全码。",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    text = "留空则显示身份缩写。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(name) }) { Text("保存") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
 }
 
 /** 一组条目：一张浅灰卡片，条目之间一条细线。 */

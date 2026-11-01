@@ -477,10 +477,17 @@ private fun ChatRoute(
         // 一个没有备注的成员与自己看起来会一模一样。
         val memberNames = runCatching {
             com.schat.android.chat.GroupController.members(currentGroup.stateJson).map { member ->
-                val name = state.contacts
-                    .firstOrNull { it.identityHex.equals(member.identityHex, ignoreCase = true) }
-                    ?.displayName
-                    ?: com.schat.android.core.contacts.abbreviate(member.identityHex)
+                val name = when {
+                    // 自己那一行用自己设的昵称；没有就退回「我」。
+                    member.identityHex.equals(myIdentity, ignoreCase = true) ->
+                        state.myNickname.ifBlank { "我" }
+                    else ->
+                        state.contacts
+                            .firstOrNull { it.identityHex.equals(member.identityHex, ignoreCase = true) }
+                            ?.displayName
+                            ?: state.peerNames[member.identityHex.lowercase()]
+                            ?: com.schat.android.core.contacts.abbreviate(member.identityHex)
+                }
                 if (member.identityHex.equals(myIdentity, ignoreCase = true)) "$name（我）" else name
             }
         }.getOrDefault(emptyList())
@@ -551,6 +558,7 @@ private fun ChatRoute(
                         recoveryCode = profile.recoveryCode,
                         serverUri = profile.serverUri,
                         contacts = state.contacts,
+                        nickname = state.myNickname,
                     ),
                 )
                 RecoveryBackup.seal(payload, words)
@@ -564,7 +572,11 @@ private fun ChatRoute(
                     }
                     prepared.fold(
                         onSuccess = { restored ->
-                            controller.restoreFromBackup(restored.first, restored.second) { failure ->
+                            controller.restoreFromBackup(
+                                restored.profile,
+                                restored.contacts,
+                                restored.nickname,
+                            ) { failure ->
                                 main.post {
                                     if (failure == null) {
                                         // 身份换了，控制器里缓存的 myIdentityHex / 邮箱
@@ -606,6 +618,8 @@ private fun ChatRoute(
         onTab = { tab = it },
         state = state,
         myIdentity = myIdentity,
+        nickname = state.myNickname,
+        onSetNickname = { controller.setMyNickname(it) },
         serverUri = profile.serverUri,
         serverDisplay = "${config.host}:${config.port}",
         onOpenConversation = { controller.openConversation(it) },
@@ -636,7 +650,7 @@ private fun ChatRoute(
 private fun prepareRestore(
     envelope: String,
     words: List<String>,
-): Pair<ClientProfileData, List<com.schat.android.core.contacts.Contact>> {
+): RestoredProfile {
     val opened = RecoveryBackup.open(envelope, words)
     val backup = ProfileBackupCodec.decode(opened)
         ?: throw IllegalStateException("备份内容不完整")
@@ -651,8 +665,15 @@ private fun prepareRestore(
         recoveryCode = backup.recoveryCode,
         serverUri = backup.serverUri,
     )
-    return restored to backup.contacts
+    return RestoredProfile(restored, backup.contacts, backup.nickname)
 }
+
+/** 一份解开的备份：档案、联系人、以及设备自己的昵称。 */
+private data class RestoredProfile(
+    val profile: ClientProfileData,
+    val contacts: List<com.schat.android.core.contacts.Contact>,
+    val nickname: String,
+)
 
 /**
  * The unlock prompt shown on every launch after setup.

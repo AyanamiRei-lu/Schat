@@ -22,6 +22,8 @@ fun HomeScreen(
     onTab: (HomeTab) -> Unit,
     state: ChatState,
     myIdentity: String,
+    nickname: String,
+    onSetNickname: (String) -> Unit,
     serverUri: String,
     serverDisplay: String,
     onOpenConversation: (String) -> Unit,
@@ -58,6 +60,8 @@ fun HomeScreen(
 
                     HomeTab.Mine -> MineTab(
                         myIdentity = myIdentity,
+                        nickname = nickname,
+                        onSetNickname = onSetNickname,
                         serverDisplay = serverDisplay,
                         serverUri = serverUri,
                         onOpenRecovery = onOpenRecovery,
