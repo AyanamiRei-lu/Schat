@@ -1,6 +1,7 @@
 package mobile
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"testing"
@@ -427,6 +428,65 @@ func TestDecryptRefusesAHandshakePayload(t *testing.T) {
 	// A handshake handed to the ratchet must be refused, not misparsed.
 	if _, err := initiator.Decrypt(wire); err == nil {
 		t.Fatal("a handshake payload was accepted as an encrypted frame")
+	}
+}
+
+func TestEncryptProfileRoundTrips(t *testing.T) {
+	initiator, responder := newBoundPair(t)
+	defer initiator.Close()
+	defer responder.Close()
+
+	payload := []byte("SCHAT-NICK-1\n" + "5LiA5Y+q")
+	wire, err := initiator.EncryptProfile(testToken, payload)
+	if err != nil {
+		t.Fatalf("EncryptProfile: %v", err)
+	}
+
+	kind, err := ContentType(wire)
+	if err != nil {
+		t.Fatalf("ContentType: %v", err)
+	}
+	if kind != ContentTypeProfile {
+		t.Fatalf("content type is %#x, want a profile announcement", kind)
+	}
+
+	got, err := responder.DecryptProfile(wire)
+	if err != nil {
+		t.Fatalf("DecryptProfile: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("the payload came back as %q", got)
+	}
+}
+
+func TestDecryptRefusesAProfileFrame(t *testing.T) {
+	initiator, responder := newBoundPair(t)
+	defer initiator.Close()
+	defer responder.Close()
+
+	wire, err := initiator.EncryptProfile(testToken, []byte("SCHAT-NICK-1\nQQ=="))
+	if err != nil {
+		t.Fatalf("EncryptProfile: %v", err)
+	}
+
+	// A profile announcement must not be appended to the conversation as a chat message.
+	if _, err := responder.Decrypt(wire); err == nil {
+		t.Fatal("a profile announcement was accepted as a chat frame")
+	}
+}
+
+func TestDecryptProfileRefusesAChatFrame(t *testing.T) {
+	initiator, responder := newBoundPair(t)
+	defer initiator.Close()
+	defer responder.Close()
+
+	wire, err := initiator.Encrypt(testToken, []byte("hello"), "text")
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+
+	if _, err := responder.DecryptProfile(wire); err == nil {
+		t.Fatal("a chat frame was accepted as a profile announcement")
 	}
 }
 

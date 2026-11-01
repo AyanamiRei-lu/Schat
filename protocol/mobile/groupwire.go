@@ -73,6 +73,12 @@ func UnwrapGroup(wire []byte) ([]byte, error) {
 		return nil, fmt.Errorf("schat: this is a one-to-one frame, not a group message")
 	case 0x02:
 		return nil, fmt.Errorf("schat: this is a one-to-one handshake, not a group message")
+	case ContentTypeProfile:
+		return nil, fmt.Errorf("schat: this is a one-to-one nickname announcement, " +
+			"not a group message")
+	case ContentTypeGroupProfile:
+		return nil, fmt.Errorf("schat: this is a group nickname announcement, " +
+			"not a group message")
 	default:
 		return nil, fmt.Errorf("schat: unknown envelope content type %#02x", wire[16])
 	}

@@ -46,6 +46,13 @@ const (
 
 	// ContentTypeHandshake is a plaintext session initiation.
 	ContentTypeHandshake byte = 0x02
+
+	// ContentTypeProfile is a one-to-one nickname (self-declared name) announcement.
+	//
+	// It is a separate type from ContentTypeFrame because the receiver must know what it
+	// has BEFORE it appends anything to a conversation: a nickname that lands in the
+	// message list is a message that never existed.
+	ContentTypeProfile byte = 0x06
 )
 
 // ContentType reports which kind of payload a relay envelope carries.
@@ -280,6 +287,19 @@ func preKeyStoreToBinding(store *protocol.PreKeyStore) (string, error) {
 // to choose which of the recipient's tokens to use and to keep it fresh; the protocol
 // layer has no opinion about routing.
 func (s *Session) Encrypt(tokenHex string, plaintext []byte, profile string) ([]byte, error) {
+	return s.encryptAs(tokenHex, plaintext, profile, ContentTypeFrame)
+}
+
+// EncryptProfile seals a nickname announcement under the session.
+//
+// It uses the "text" AEAD profile: a name is short and belongs to the smallest padding
+// bucket, exactly like a chat message. The only thing that differs is the envelope type,
+// so the receiver knows not to render it as a message.
+func (s *Session) EncryptProfile(tokenHex string, plaintext []byte) ([]byte, error) {
+	return s.encryptAs(tokenHex, plaintext, "text", ContentTypeProfile)
+}
+
+func (s *Session) encryptAs(tokenHex string, plaintext []byte, profile string, contentType byte) ([]byte, error) {
 	if s == nil || s.s == nil {
 		return nil, fmt.Errorf("scs1: nil session")
 	}
@@ -304,7 +324,7 @@ func (s *Session) Encrypt(tokenHex string, plaintext []byte, profile string) ([]
 	frame := envelope.Marshal()
 	out := make([]byte, 0, len(frame)+1)
 	out = append(out, frame[:protocol.TokenSize]...)
-	out = append(out, ContentTypeFrame)
+	out = append(out, contentType)
 	out = append(out, frame[protocol.TokenSize:]...)
 	return out, nil
 }
@@ -314,6 +334,19 @@ func (s *Session) Encrypt(tokenHex string, plaintext []byte, profile string) ([]
 // The token in the envelope is ignored: it addressed this client's own mailbox on the
 // way in, and it carries no meaning once the message has arrived.
 func (s *Session) Decrypt(wire []byte) ([]byte, error) {
+	return s.decryptAs(wire, ContentTypeFrame, "an encrypted frame")
+}
+
+// DecryptProfile opens a nickname announcement.
+//
+// It refuses every other content type. That is what keeps a profile from being appended to
+// the conversation as a message the peer never sent, and a message from being consumed as a
+// name that silently never updates.
+func (s *Session) DecryptProfile(wire []byte) ([]byte, error) {
+	return s.decryptAs(wire, ContentTypeProfile, "a nickname announcement")
+}
+
+func (s *Session) decryptAs(wire []byte, want byte, label string) ([]byte, error) {
 	if s == nil || s.s == nil {
 		return nil, fmt.Errorf("scs1: nil session")
 	}
@@ -322,8 +355,8 @@ func (s *Session) Decrypt(wire []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if kind != ContentTypeFrame {
-		return nil, fmt.Errorf("scs1: relay payload carries content type %d, not an encrypted frame", kind)
+	if kind != want {
+		return nil, fmt.Errorf("scs1: relay payload carries content type %d, not %s", kind, label)
 	}
 
 	// Reassemble token || frame for the protocol decoder.
