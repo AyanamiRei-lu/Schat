@@ -22,13 +22,6 @@ data class GroupRecord(
      * 它不在快照里，而必须与快照一起保存：代数传错不会报错，只会让**接收方全部解不开**。
      */
     val generation: Long,
-
-    /**
-     * 成员备注名，按叶子下标。
-     *
-     * 只是本机显示用的名字；群里的身份由签名密钥决定，与这里的名字无关。
-     */
-    val memberNames: Map<Long, String> = emptyMap(),
 )
 
 /**
@@ -55,21 +48,6 @@ data class GroupMessage(
 )
 
 /**
- * 把群保存在加密存储里。
- *
- * # 为什么用索引键而不是枚举
- *
- * 存储层只有 contains / get / put / remove，没有"列出所有键"。所以群标识单独放在
- * [KEY_INDEX] 里，用换行分隔。**这正是成员备注名必须转义的原因**——同一个存储里，
- * 一个能注入分隔符的名字就会变成第二条记录。
- *
- * # 为什么旧版本被拒绝而不是迁移
- *
- * 快照的版本在 Go 侧的 JSON 里（`snapshotVersion`），不在这一层。版本不符时
- * `GroupController` 会拒绝它——**猜一个群密钥的布局不是可以悄悄做的事**，
- * 这与单聊会话快照的既有规则一致。
- */
-/**
  * 每个群保留的消息条数上限。**必须有上限**：存储没有总量限制，而一个群可以无限地收消息。
  *
  * 放在文件级而不是伴生对象里，是为了让它可被测试引用——上限的行为是需要被断言的东西，
@@ -77,6 +55,21 @@ data class GroupMessage(
  */
 const val GROUP_MESSAGE_LIMIT = 500
 
+/**
+ * 把群保存在加密存储里。
+ *
+ * # 为什么用索引键而不是枚举
+ *
+ * 存储层只有 contains / get / put / remove，没有"列出所有键"。所以群标识单独放在
+ * [KEY_INDEX] 里，用换行分隔。**这正是消息正文必须转义的原因**——同一个存储里，
+ * 一个能注入分隔符的正文就会变出第二条消息记录。
+ *
+ * # 为什么旧版本被拒绝而不是迁移
+ *
+ * 快照的版本在 Go 侧的 JSON 里（`snapshotVersion`），不在这一层。版本不符时
+ * `GroupController` 会拒绝它——**猜一个群密钥的布局不是可以悄悄做的事**，
+ * 这与单聊会话快照的既有规则一致。
+ */
 class GroupStore(private val store: EncryptedStore) {
 
     /** 保存一个群，覆盖已有的同名记录。 */
@@ -86,7 +79,10 @@ class GroupStore(private val store: EncryptedStore) {
 
         store.putString(stateKey(record.groupIdHex), record.stateJson)
         store.putString(generationKey(record.groupIdHex), record.generation.toString())
-        store.putString(namesKey(record.groupIdHex), encodeNames(record.memberNames))
+
+        // 旧版本按叶子下标保存过成员备注名。它早已不是显示来源（下标每次成员变更都会变，
+        // 显示改由身份键控的名字簿回答），下一次保存时顺手清掉，别让旧数据一直留在保险库里。
+        store.remove(namesKey(record.groupIdHex))
 
         addToIndex(record.groupIdHex)
     }
@@ -119,7 +115,6 @@ class GroupStore(private val store: EncryptedStore) {
             groupIdHex = groupIdHex,
             stateJson = state,
             generation = generation,
-            memberNames = decodeNames(store.getString(namesKey(groupIdHex))),
         )
     }
 
@@ -211,51 +206,19 @@ class GroupStore(private val store: EncryptedStore) {
         // 叶子密钥的私钥：入群者用它解开寻址给自己的路径秘密，下标决定它尝试哪一个密文。
         const val KEY_MY_LEAF_KEY = "groups.myLeafKey"
 
-        // 叶子密钥的私钥：入群者用它解开寻址给自己的路径秘密。它与 KeyPackage 一起保存，
-        // 因为 KeyPackage 描述的就是那片叶子 —— 少了它，成员能入群却跟不上任何一条提交。
-
-        /** 每个群保留的消息条数上限。 */
-        const val MAX_MESSAGES = 500
-
         fun messagesKey(id: String) = "group.$id.messages"
 
         fun stateKey(id: String) = "group.$id.state"
         fun generationKey(id: String) = "group.$id.generation"
+
+        /** 旧版本按叶子下标存的成员备注名。只用于清理，不再读、不再写。 */
         fun namesKey(id: String) = "group.$id.names"
-
-        /**
-         * 备注名的编码：每行 `叶子下标:名字`。
-         *
-         * 名字里的换行、回车与冒号会被转义成 `\n`、`\r`、`\:`。
-         * **这不是美化，是防止注入**：不转义的话，一个叫 "x\n5:某人" 的备注名
-         * 会在读回时变出一条属于叶子 5 的伪造记录。
-         */
-        fun encodeNames(names: Map<Long, String>): String =
-            names.entries
-                .sortedBy { it.key }
-                .joinToString("\n") { (leaf, name) -> "$leaf:${escape(name)}" }
-
-        fun decodeNames(raw: String?): Map<Long, String> {
-            if (raw.isNullOrEmpty()) return emptyMap()
-
-            val out = mutableMapOf<Long, String>()
-            for (line in raw.split('\n')) {
-                if (line.isEmpty()) continue
-                val separator = line.indexOf(':')
-                // 结构不完整的行被丢弃，而不是猜测它的含义：一条读不懂的记录不该变成一条
-                // 看似有效的成员。
-                if (separator <= 0) continue
-                val leaf = line.substring(0, separator).toLongOrNull() ?: continue
-                out[leaf] = unescape(line.substring(separator + 1))
-            }
-            return out
-        }
 
         /**
          * 消息的编码：每行 `叶子|mine|代数|时间|转义后的正文`。
          *
-         * 正文里同样要转义 `|`、`\\`、换行与回车——理由与备注名一样：
-         * 一个能注入分隔符的正文会变出一条伪造的消息记录。
+         * 正文里要转义 `|`、`\\`、换行与回车：一个能注入分隔符的正文会变出一条伪造的
+         * 消息记录。
          */
         fun encodeMessages(messages: List<GroupMessage>): String =
             messages.joinToString("\n") { m ->

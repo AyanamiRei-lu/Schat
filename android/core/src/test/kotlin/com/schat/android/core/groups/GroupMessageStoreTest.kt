@@ -64,6 +64,17 @@ class GroupMessageStoreTest {
     }
 
     @Test
+    fun `separator characters in a body survive the round trip`() {
+        // `:`、回车与反斜杠都会被转义。它们曾经只出现在成员备注名里，现在名字簿取代了
+        // 那份映射，但消息编码仍然共用同一对 escape/unescape——这组断言防止它们被顺手删掉。
+        val store = readyStore()
+        val body = "a:b\rline\\break\\"
+        store.appendMessage("67727031", message(body))
+
+        assertEquals(body, store.loadMessages("67727031").single().text)
+    }
+
+    @Test
     fun `the history is capped and keeps the newest`() {
         val store = readyStore()
         repeat(GROUP_MESSAGE_LIMIT + 5) { index ->

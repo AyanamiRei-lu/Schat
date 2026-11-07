@@ -24,18 +24,16 @@ class GroupStoreTest {
         id: String = "67727031",
         state: String = "{\"version\":1}",
         generation: Long = 0,
-        names: Map<Long, String> = emptyMap(),
-    ) = GroupRecord(id, state, generation, names)
+    ) = GroupRecord(id, state, generation)
 
     @Test
     fun `saves and reads back a group`() {
         val store = newStore()
-        store.save(record(generation = 7, names = mapOf(0L to "爱丽丝", 1L to "Bob")))
+        store.save(record(generation = 7))
 
         val loaded = store.load("67727031")
         assertEquals("{\"version\":1}", loaded?.stateJson)
         assertEquals(7L, loaded?.generation)
-        assertEquals(mapOf(0L to "爱丽丝", 1L to "Bob"), loaded?.memberNames)
         assertEquals(listOf("67727031"), store.list())
     }
 
@@ -59,33 +57,20 @@ class GroupStoreTest {
     }
 
     @Test
-    fun `a name cannot inject a member`() {
-        // The index and the names share one store and one separator. An unescaped newline or
-        // colon in a display name would come back as an extra member — a record that looks like
-        // it belongs to leaf 5 and does not.
-        val store = newStore()
-        val hostile = "x\n5:somebody else"
-        store.save(record(names = mapOf(0L to hostile)))
+    fun `a legacy member-name record is cleaned up`() {
+        // 旧版本按叶子下标存过成员备注名。它已不是显示来源（显示改由身份键控的名字簿回答），
+        // 所以重新保存与删除群都必须把它清掉，而不是让旧数据永远留在保险库里。
+        val enc = EncryptedStore(File(temp.root, "vault.dat"), key)
+        val store = GroupStore(enc)
+        store.save(record())
 
-        val loaded = store.load("67727031")!!
-        assertEquals(1, loaded.memberNames.size)
-        assertEquals(hostile, loaded.memberNames[0L])
-        assertNull(loaded.memberNames[5L])
-    }
+        enc.putString("group.67727031.names", "0:A")
+        store.save(record())
+        assertFalse(enc.contains("group.67727031.names"))
 
-    @Test
-    fun `every separator in a name survives a round trip`() {
-        val store = newStore()
-        val names = mapOf(
-            0L to "a:b",
-            1L to "line\nbreak",
-            2L to "carriage\rreturn",
-            3L to "back\\slash",
-            4L to "trailing\\",
-        )
-        store.save(record(names = names))
-
-        assertEquals(names, store.load("67727031")?.memberNames)
+        enc.putString("group.67727031.names", "0:A")
+        store.clear("67727031")
+        assertFalse(enc.contains("group.67727031.names"))
     }
 
     @Test
@@ -102,14 +87,13 @@ class GroupStoreTest {
     @Test
     fun `clearing one group leaves the others`() {
         val store = newStore()
-        store.save(record(id = "aaaa", names = mapOf(0L to "A")))
-        store.save(record(id = "bbbb", names = mapOf(0L to "B")))
+        store.save(record(id = "aaaa"))
+        store.save(record(id = "bbbb"))
 
         store.clear("aaaa")
 
         assertNull(store.load("aaaa"))
         assertEquals("{\"version\":1}", store.load("bbbb")?.stateJson)
-        assertEquals(mapOf(0L to "B"), store.load("bbbb")?.memberNames)
         assertEquals(listOf("bbbb"), store.list())
     }
 
