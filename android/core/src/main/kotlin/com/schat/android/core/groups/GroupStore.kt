@@ -292,9 +292,6 @@ class GroupStore(private val store: EncryptedStore) {
                     // 注意：这里必须转义成不含 '|' 的形式。写成 "\\|" 是错的——解码按字符
                     // 切分，转义后的分隔符照样会被切开，于是整条消息被丢弃。
                     '|' -> append("\\p")
-                    // 注意：这里必须转义成不含 '|' 的形式。写成 "\\|" 是错的——解码按字符
-                    // 切分，转义后的分隔符照样会被切开，于是整条消息被丢弃。
-                    '|' -> append("\\p")
                     else -> append(ch)
                 }
             }
@@ -310,7 +307,6 @@ class GroupStore(private val store: EncryptedStore) {
                         'n' -> { append('\n'); i += 2 }
                         'r' -> { append('\r'); i += 2 }
                         ':' -> { append(':'); i += 2 }
-                        'p' -> { append('|'); i += 2 }
                         'p' -> { append('|'); i += 2 }
                         else -> { append(ch); i++ }
                     }
