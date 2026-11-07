@@ -43,7 +43,7 @@
 
 | 能力 | 验证方式 | 结果 |
 |---|---|---|
-| 协议核心与 MLS 全部层（会话建立、双棘轮、乱序/重放/篡改/反射防护、MLS 各层） | `cd protocol && go test ./...` | ✅ **305 项通过 + 49 项子测试，1 项 SKIP** |
+| 协议核心与 MLS 全部层（会话建立、双棘轮、乱序/重放/篡改/反射防护、MLS 各层） | `cd protocol && go test ./...` | ✅ **312 项通过 + 49 项子测试，1 项 SKIP** |
 | **MLS 表示层编解码器（步骤 6a / M1）** | `go test ./protocol/mls/...` | ✅ 16 项 + fuzz：RFC 9420 的三个黄金向量逐字节、**非最短编码必须拒绝**、1 GiB 长度声明不分配即被拒 |
 | **MLS 密码学基础层（步骤 6a / M2a）** | 官方 `crypto-basics.json` | ✅ **12 项检查逐字节通过**（套件 0x0001 与 0x0003）；未实现套件的向量被计数并报告，不静默跳过 |
 | **MLS 密钥调度（步骤 6a / M2b）** | 官方 `key-schedule.json` | ✅ **140 项检查、10 个 epoch 逐字节通过**；4 种链式写法由向量裁决（group context 确实绑进 joiner secret） |
@@ -63,7 +63,7 @@
 | **真实服务器预密钥往返（协议层）** | `SCHAT_RELAY_URL=… go test ./mobile/ -run LiveRelay` | ✅ 发布整池 → 取两次拿到**不同**的一次性预密钥 → 建会话 → 双向加解密 |
 | **真实服务器往返（客户端网络层）** | `gradlew :core:test "-Pschat.relayUrl=…"` | ✅ TLS 固定 + WebSocket 升级 + 订阅被应答；**错指纹被拒、无指纹被拒** |
 | **握手可在中继信封内完成** | `TestFullHandshakeOverTheRelayPayloadFormat` | ✅ MVP 核心链路已跑通 |
-| **会话控制器与聊天界面** | `:app:assembleDebug` | ✅ 编译通过并产出 APK（**真机双机对发尚待验证**） |
+| **会话控制器与聊天界面** | `:app:assembleDebug` | ✅ 编译通过并产出 APK；**真机双机对发已通过**（v0.12） |
 | **安全码双方均可计算** | `TestBothPeersCanComputeTheSafetyNumber` | ✅ 两侧算出的 60 位数字完全相同 |
 | **预密钥整池发布** | `TestPublishBundleJSONCarriesTheWholePool` | ✅ 100 个一次性预密钥一次发布，而非只发布 1 个 |
 | 并发安全 | `go test -race ./...` | ✅ 无竞态 |

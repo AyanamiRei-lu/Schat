@@ -49,7 +49,7 @@
 
 | 能力 | 验证方式 | 结果 |
 |---|---|---|
-| SCS-1 协议核心：会话建立、双棘轮、乱序/重放/篡改/反射防护 | `cd protocol && go test ./...` | **305 项通过 + 49 项子测试，1 项 SKIP** |
+| SCS-1 协议核心：会话建立、双棘轮、乱序/重放/篡改/反射防护 | `cd protocol && go test ./...` | **312 项通过 + 49 项子测试，1 项 SKIP** |
 | MLS 表示层编解码器 | 官方 RFC 9420 黄金向量 | 逐字节通过；非最短编码被拒 |
 | MLS 密码学基础层 | 官方 `crypto-basics.json` | **12 项**逐字节通过（套件 0x0001 与 0x0003） |
 | MLS 密钥调度 | 官方 `key-schedule.json` | **140 项**、10 个 epoch 逐字节通过 |
@@ -59,7 +59,7 @@
 | 中继服务器 | `cd server && go test ./...` | **116 项通过 + 32 项子测试** |
 | 服务端：零第三方依赖 | `GOWORK=off go list -m all` | 只有自身模块 |
 | 服务端：不导入协议核心 | `GOWORK=off go list -deps ./...` | 依赖树里没有 `protocol` |
-| 客户端核心（纯 JVM） | `cd android && ./gradlew :core:test` | **236 项，0 失败**（含本次新增的 17 项恢复相关测试） |
+| 客户端核心（纯 JVM） | `cd android && ./gradlew :core:test` | **260 项，0 失败**（含恢复码备份与昵称测试） |
 | 客户端编译 | `./gradlew :app:assembleDebug` | 干净构建产出 **27.07 MB** debug APK |
 | CI | GitHub Actions | 三个 job；Go 两个为绿 |
 
@@ -294,7 +294,7 @@ go build ./... && go test ./...
 | `contacts/ContactList.kt` | 联系人列表上的操作 |
 | `crypto/Vault.kt` | 从 SCS-1 协议核心派生密钥材料 |
 | `crypto/VaultSession.kt` | **不保密**的那部分保管库参数 |
-| `groups/GroupStore.kt` | 一个群在本机保存的全部内容（状态、棘轮代数、成员备注名、消息） |
+| `groups/GroupStore.kt` | 一个群在本机保存的全部内容（状态、棘轮代数、消息）；成员名改由按身份索引的名字簿回答 |
 | `net/RelayClient.kt` | 中继协议的客户端一半 |
 | `net/DirectoryClient.kt` | 经中继发布与获取预密钥包 |
 | `net/PinnedTrust.kt` | 针对自签名中继的**证书固定** |
@@ -304,7 +304,7 @@ go build ./... && go test ./...
 | `qr/QrPayload.kt` | 一个 SCHAT 二维码能承载什么 |
 | `data/store/EncryptedStore.kt` | 文件支撑的键值存储，值用 **AES-256-GCM** 加密 |
 
-**测试**：`android/core/src/test/` 下 11 个测试文件，共 194 项。
+**测试**：`android/core/src/test/` 下 18 个测试文件，共 260 项。
 
 ### 7.2 `:app` —— Android 绑定与界面
 
@@ -375,7 +375,7 @@ go build ./... && go test ./...
 ```bash
 cd android
 
-# 客户端核心（纯 JVM，不需要 Android SDK）——194 项
+# 客户端核心（纯 JVM，不需要 Android SDK）——260 项
 ./gradlew :core:test
 
 # 编译客户端
@@ -660,9 +660,9 @@ powershell -ExecutionPolicy Bypass -File tools/verify.ps1
 
 | 数字 | 命令 |
 |---|---|
-| protocol **305 通过 / 49 子测试 / 1 SKIP** | `cd protocol && go test ./... -count=1 -v` 后数 `--- PASS` 行 |
+| protocol **312 通过 / 49 子测试 / 1 SKIP** | `cd protocol && go test ./... -count=1 -v` 后数 `--- PASS` 行 |
 | server **116 通过 / 32 子测试** | `cd server && go test ./... -count=1 -v` |
-| `:core` **236 项，0 失败** | `cd android && ./gradlew :core:test`；或数 `android/core/build/test-results/test/*.xml`（含新增的 17 项恢复测试） |
+| `:core` **260 项，0 失败** | `cd android && ./gradlew :core:test`；或数 `android/core/build/test-results/test/*.xml`（含恢复与昵称测试） |
 | APK **27.07 MB** | `./gradlew clean :app:assembleDebug` 后看 `android/app/build/outputs/apk/debug/`；**不要用增量构建的结果** |
 | AAR **10.18 MB** | `tools/build-protocol.ps1` 的输出 |
 | 部署内存 **2.7 MB** | 服务器上 `systemctl status schat-server` |
